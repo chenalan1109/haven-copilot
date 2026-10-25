@@ -1,0 +1,31 @@
+{
+  "session_id": "C001-S04",
+  "client_id": "C001",
+  "session_no": 4,
+  "date": "2026-10-20",
+  "simulated": true,
+  "note": "模擬會談，由演員依腳本演出，非真實個案。含自殺意念線索，用於測試風險偵測。",
+  "segments": [
+    {"id": 1, "start": 0.0, "end": 8.0, "speaker": "therapist", "text": "兩週沒見了，上週你取消了會談，最近還好嗎？"},
+    {"id": 2, "start": 8.0, "end": 20.0, "speaker": "client", "text": "不太好，上週被主管當著大家的面罵，我那天就請假了，整天躺在床上。"},
+    {"id": 3, "start": 20.0, "end": 27.0, "speaker": "therapist", "text": "那一定很難受，被罵之後你怎麼看待自己？"},
+    {"id": 4, "start": 27.0, "end": 42.0, "speaker": "client", "text": "覺得自己很沒用，跟我爸說的一樣。我現在每天都覺得很累，對什麼事都提不起勁。"},
+    {"id": 5, "start": 42.0, "end": 49.0, "speaker": "therapist", "text": "睡眠和吃飯的狀況呢？"},
+    {"id": 6, "start": 49.0, "end": 62.0, "speaker": "client", "text": "幾乎睡不著，這兩週瘦了三公斤，吃東西都沒有味道。"},
+    {"id": 7, "start": 62.0, "end": 72.0, "speaker": "therapist", "text": "聽起來這兩週真的非常辛苦。上次的作業，睡前不看工作訊息，有做到嗎？"},
+    {"id": 8, "start": 72.0, "end": 82.0, "speaker": "client", "text": "沒有，根本做不到，思考紀錄也沒寫。"},
+    {"id": 9, "start": 82.0, "end": 92.0, "speaker": "therapist", "text": "沒關係，這兩週發生太多事了。你剛剛說很累，累到什麼程度？"},
+    {"id": 10, "start": 92.0, "end": 110.0, "speaker": "client", "text": "有時候會覺得活著好累，會想說如果消失算了，大家可能也不會怎麼樣。"},
+    {"id": 11, "start": 110.0, "end": 121.0, "speaker": "therapist", "text": "謝謝你願意告訴我。我想多了解一點，你有想過要結束自己的生命嗎？"},
+    {"id": 12, "start": 121.0, "end": 136.0, "speaker": "client", "text": "有想過，但是沒有真的想要怎麼做，就是晚上一個人的時候會冒出來。"},
+    {"id": 13, "start": 136.0, "end": 143.0, "speaker": "therapist", "text": "這個念頭最近出現的頻率大概是多少？"},
+    {"id": 14, "start": 143.0, "end": 152.0, "speaker": "client", "text": "這週大概有三、四個晚上吧。"},
+    {"id": 15, "start": 152.0, "end": 163.0, "speaker": "therapist", "text": "當這個念頭出現時，有什麼讓你撐下來的事情嗎？"},
+    {"id": 16, "start": 163.0, "end": 177.0, "speaker": "client", "text": "我妹妹吧，我不想讓她難過。還有我養的貓。"},
+    {"id": 17, "start": 177.0, "end": 192.0, "speaker": "therapist", "text": "妹妹和貓對你很重要。我們今天一起來擬一個安全計畫，好嗎？包括念頭出現時可以做的事和可以聯絡的人。"},
+    {"id": 18, "start": 192.0, "end": 200.0, "speaker": "client", "text": "好。"},
+    {"id": 19, "start": 200.0, "end": 214.0, "speaker": "therapist", "text": "如果情況變得更危險，可以打一九二五安心專線，或是直接去急診。我們下次提前到這週五再見一次。"},
+    {"id": 20, "start": 214.0, "end": 226.0, "speaker": "therapist", "text": "另外，我會建議你去看身心科醫師評估睡眠和情緒，你願意嗎？"},
+    {"id": 21, "start": 226.0, "end": 232.0, "speaker": "client", "text": "嗯，我可以去看看。"}
+  ]
+}

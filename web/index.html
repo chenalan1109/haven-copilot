@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Haven 心港</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Haven <span>心港</span></div>
+    <div class="status" id="status">連線中…</div>
+  </header>
+  <div class="layout">
+    <aside class="sidebar">
+      <h2>個案 <small>Clients</small></h2>
+      <ul id="client-list"></ul>
+      <p class="sim-note">所有資料皆為模擬會談，非真實個案。<br>Simulated sessions only.</p>
+    </aside>
+    <main id="main">
+      <div class="empty">選擇左側個案開始。</div>
+    </main>
+  </div>
+  <template id="tpl-client">
+    <section class="card brief">
+      <div class="card-head">
+        <h1 class="client-name"></h1>
+        <span class="concern"></span>
+      </div>
+      <h3>會談前摘要 <small>Pre-session brief</small></h3>
+      <div class="alerts"></div>
+      <div class="charts"></div>
+      <div class="last-plan"></div>
+    </section>
+    <section class="card">
+      <h3>會談 <small>Sessions</small></h3>
+      <div class="session-buttons"></div>
+      <details class="upload">
+        <summary>上傳會談錄音（本機轉寫，錄音轉寫後即刪除）</summary>
+        <form class="upload-form">
+          <input type="text" name="session_id" placeholder="會談編號，例如 C001-S05" required pattern="[A-Za-z0-9-]{1,40}">
+          <input type="file" name="audio" accept="audio/*" required>
+          <button type="submit">轉寫並產生紀錄</button>
+        </form>
+        <p class="upload-msg"></p>
+      </details>
+    </section>
+    <section class="card">
+      <h3>個案問答 <small>Ask about this client</small></h3>
+      <form class="ask-form">
+        <input type="text" name="q" placeholder="例如：哪幾次提到父親？" required>
+        <button type="submit">查詢</button>
+      </form>
+      <div class="ask-result"></div>
+    </section>
+  </template>
+  <script src="app.js"></script>
+</body>
+</html>

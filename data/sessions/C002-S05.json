@@ -1,0 +1,21 @@
+{
+  "session_id": "C002-S05",
+  "client_id": "C002",
+  "session_no": 5,
+  "date": "2026-10-13",
+  "simulated": true,
+  "note": "模擬會談，由演員依腳本演出，非真實個案。",
+  "segments": [
+    {"id": 1, "start": 0.0, "end": 6.0, "speaker": "therapist", "text": "這週的分組報告後來怎麼樣了？"},
+    {"id": 2, "start": 6.0, "end": 19.0, "speaker": "client", "text": "我有上台講了！雖然一開始手一直抖，但講到後面就比較順了。"},
+    {"id": 3, "start": 19.0, "end": 25.0, "speaker": "therapist", "text": "太好了，上台前你的焦慮大概幾分？"},
+    {"id": 4, "start": 25.0, "end": 34.0, "speaker": "client", "text": "上台前大概八十分，講完之後降到四十分左右。"},
+    {"id": 5, "start": 34.0, "end": 44.0, "speaker": "therapist", "text": "你注意到焦慮是會自己降下來的，這就是我們說的暴露練習的效果。"},
+    {"id": 6, "start": 44.0, "end": 57.0, "speaker": "client", "text": "對，而且同學也沒有像我想像的那樣笑我，有一個同學還說我講得很清楚。"},
+    {"id": 7, "start": 57.0, "end": 65.0, "speaker": "therapist", "text": "那拖延的部分呢？這週的作業有照計畫做嗎？"},
+    {"id": 8, "start": 65.0, "end": 78.0, "speaker": "client", "text": "有用番茄鐘，每天讀書兩個番茄鐘，五天裡有做到四天。"},
+    {"id": 9, "start": 78.0, "end": 88.0, "speaker": "therapist", "text": "五天做到四天很棒。下週想挑戰什麼？"},
+    {"id": 10, "start": 88.0, "end": 99.0, "speaker": "client", "text": "我想試試看在課堂上主動發問一次。"},
+    {"id": 11, "start": 99.0, "end": 110.0, "speaker": "therapist", "text": "好，那下週的作業就是主動發問一次，並記錄發問前後的焦慮分數。"}
+  ]
+}

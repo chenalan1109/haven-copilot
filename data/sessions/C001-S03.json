@@ -1,0 +1,30 @@
+{
+  "session_id": "C001-S03",
+  "client_id": "C001",
+  "session_no": 3,
+  "date": "2026-10-06",
+  "simulated": true,
+  "note": "模擬會談，由演員依腳本演出，非真實個案。",
+  "segments": [
+    {"id": 1, "start": 0.0, "end": 7.5, "speaker": "therapist", "text": "上次我們談到你在公司的壓力，這一週過得怎麼樣？"},
+    {"id": 2, "start": 7.5, "end": 21.0, "speaker": "client", "text": "還是很累，主管又把一個新專案丟給我，我每天都加班到九點多才回家。"},
+    {"id": 3, "start": 21.0, "end": 27.0, "speaker": "therapist", "text": "聽起來工作量又變大了，睡眠的狀況呢？"},
+    {"id": 4, "start": 27.0, "end": 41.5, "speaker": "client", "text": "睡眠很差，躺下去要一個多小時才睡得著，半夜三點多常常就醒來。"},
+    {"id": 5, "start": 41.5, "end": 49.0, "speaker": "therapist", "text": "醒來的時候腦袋裡通常在想什麼？"},
+    {"id": 6, "start": 49.0, "end": 66.0, "speaker": "client", "text": "會一直想工作做不完，還有想到我爸。他上週打電話來又說我選錯工作，說我讀那麼多書沒有用。"},
+    {"id": 7, "start": 66.0, "end": 73.0, "speaker": "therapist", "text": "爸爸這樣說的時候，你心裡的感覺是什麼？"},
+    {"id": 8, "start": 73.0, "end": 88.0, "speaker": "client", "text": "很生氣，可是又覺得他說的可能是對的，我好像真的什麼都做不好。"},
+    {"id": 9, "start": 88.0, "end": 99.0, "speaker": "therapist", "text": "所以爸爸的話好像會勾起一個「我什麼都做不好」的想法，這個想法出現的時候有多強烈？"},
+    {"id": 10, "start": 99.0, "end": 108.0, "speaker": "client", "text": "大概七十分吧，滿分一百的話。"},
+    {"id": 11, "start": 108.0, "end": 121.0, "speaker": "therapist", "text": "我們上次有練習把想法寫下來，這週你有試著做思考紀錄嗎？"},
+    {"id": 12, "start": 121.0, "end": 136.0, "speaker": "client", "text": "有寫了兩次，寫完會比較冷靜一點，但是加班太晚就沒力氣寫了。"},
+    {"id": 13, "start": 136.0, "end": 148.0, "speaker": "therapist", "text": "能寫兩次已經很不容易。寫完比較冷靜，這是很重要的發現。"},
+    {"id": 14, "start": 148.0, "end": 160.0, "speaker": "client", "text": "嗯，我發現自己對主管其實也很怕，不敢說不。"},
+    {"id": 15, "start": 160.0, "end": 172.0, "speaker": "therapist", "text": "不敢對主管說不，跟面對爸爸時的感覺，有沒有哪裡很像？"},
+    {"id": 16, "start": 172.0, "end": 188.0, "speaker": "client", "text": "好像有，都是怕對方失望，覺得如果拒絕的話，他們就會覺得我很沒用。"},
+    {"id": 17, "start": 188.0, "end": 201.0, "speaker": "therapist", "text": "這是一個很重要的連結。下週我們可以一起練習怎麼對主管提出合理的工作量。"},
+    {"id": 18, "start": 201.0, "end": 214.0, "speaker": "therapist", "text": "這週的作業是：睡前十分鐘不看工作訊息，然後再寫兩次思考紀錄，特別是跟爸爸有關的。"},
+    {"id": 19, "start": 214.0, "end": 221.0, "speaker": "client", "text": "好，我試試看。"},
+    {"id": 20, "start": 221.0, "end": 230.0, "speaker": "therapist", "text": "那我們下週同一個時間見。"}
+  ]
+}

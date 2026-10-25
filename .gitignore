@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+data/haven.db
+data/audio/*
+!data/audio/.gitkeep
+.DS_Store
