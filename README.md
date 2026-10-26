@@ -33,18 +33,20 @@ flowchart LR
 | --- | --- | --- |
 | ASR | Speech to timestamped segments (faster-whisper, int8) | `haven/transcript.py` |
 | Note writer | Drafts SOAP or DAP notes; every sentence cites segment ids | `haven/agents/writer.py` |
-| Verifier | Checks each sentence against the segments it cites, in three layers: hard rules (numbers, time words and gendered pronouns must appear in the cited lines), word overlap, then one batched local-LLM check for paraphrases. Unsupported sentences block signing until the therapist edits, deletes or confirms them | `haven/agents/verifier.py` |
-| Risk | Flags suicide, self-harm, violence and functioning cues with the exact quote; keeps negated cues for review; checks whether screening and safety steps appear in the session | `haven/agents/risk.py` |
-| Outcome | Routine outcome monitoring: reliable change (PHQ-9: 6, GAD-7: 4), not-on-track heuristic, BSRS-5 suicide-item alert | `haven/agents/outcome.py` |
+| Verifier | Checks each sentence against the segments it cites, in three layers: hard rules (numbers, time words and gendered pronouns must appear in the cited lines; a risk sentence must keep the cited lines' negation), word overlap, then one batched local-LLM check for paraphrases. Unsupported sentences block signing until the therapist edits, deletes or confirms them | `haven/agents/verifier.py` |
+| Risk | Flags suicide, self-harm, violence and functioning cues with the exact quote; keeps negated cues for review; when suicide cues appear, shows which parts of a risk inquiry the session covered (ideation, frequency, plan, intent, access to means, past attempts, protective factors, safety plan, crisis resources) and which to consider asking or documenting | `haven/agents/risk.py` |
+| Outcome | Routine outcome monitoring: reliable change (PHQ-9: 6, GAD-7: 4), clinically significant change, not-on-track heuristic with a review prompt, PHQ-9 item 9 and BSRS-5 suicide-item alerts; writes the score lines into the note's objective section | `haven/agents/outcome.py` |
 | Case memory | Answers "which sessions mentioned her father?" from that client's own sessions only | `haven/agents/memory.py` |
 | Orchestrator | Runs the agents, times each one, stores the result and an audit log | `haven/orchestrator.py` |
 
 **Human in the loop:** Haven only produces drafts and prompts. A note is filed only after the therapist reviews and signs it. Haven does not diagnose or give any output to the client, and it does not analyse facial expressions.
 
-**Privacy guards in the code:**
-- The LLM client refuses any endpoint that is not loopback or a private LAN address (`haven/llm.py`, tested in `tests/test_agents.py`).
-- The server binds to `127.0.0.1` by default and keeps transcripts out of its console log.
-- Uploaded audio is written to a temporary file and deleted right after transcription.
+**Privacy and safety guards in the code** (tested in `tests/`):
+- The LLM client refuses any endpoint that is not loopback or a private LAN address, and never goes through an HTTP or system proxy.
+- The server binds to `127.0.0.1`, rejects requests whose `Host` header is not its own (DNS rebinding), and requires an `X-Haven` header on every POST, so another website open in the browser cannot sign or upload.
+- The server, not only the UI, refuses to sign a note with an unchecked sentence or an unsupported one the therapist has not kept. A signed note is never overwritten. The audit log records how many flagged sentences the therapist kept.
+- Uploads require the client's written consent to recording. The audio is written to a temporary file and deleted right after transcription.
+- Questionnaire scores enter the note from the score data, not from the model, so a number in the objective section is never invented.
 - Every processing, query and signing action is written to an audit log.
 
 ## Quick start (laptop, no GPU needed)
@@ -78,11 +80,11 @@ python3 scripts/prepare_demo.py
 
 | Session | Total time | Sentences backed by the transcript |
 | --- | --- | --- |
-| C001-S03 | 59 s | 9 / 11 |
-| C001-S04 | 88 s | 12 / 15 |
-| C002-S05 | 68 s | 6 / 10 |
+| C001-S03 | 63 s | 9 / 12 |
+| C001-S04 | 44 s | 7 / 12 |
+| C002-S05 | 37 s | 7 / 10 |
 
-What the verifier caught in these runs: "下週五" where the session said "這週五", "近兩週" attached to a statement that had no time frame, and feelings ("自責") the cited line did not contain. It also flags some correct paraphrases; the therapist clears those with "確認無誤". A 7B model on a laptop is the floor; Stage II moves to a larger model on the Arc Pro B70.
+Score lines filled in from the questionnaires are not counted. What the verifier caught in these runs: "下週五" where the session said "這週五", "近兩週" attached to a statement that had no time frame, and feelings ("自責") the cited line did not contain. It also flags some correct paraphrases; the therapist clears those with "確認無誤". A 7B model on a laptop is the floor; Stage II moves to a larger model on the Arc Pro B70.
 
 ### Transcribing real audio
 
@@ -102,9 +104,9 @@ python3 -m unittest discover -s tests -v
 ## Demo walkthrough
 
 1. **小安** shows four outcome alerts: PHQ-9, GAD-7 and BSRS-5 are not improving after 4 sessions, and the BSRS-5 suicide item scored 2.
-2. Open **C001-S04**. The risk panel flags 「活著好累…消失算了」 (#10) as suicidal ideation, and keeps 「沒有真的想要怎麼做」 (#12) for review because it is negated. It confirms the therapist asked about suicide (#11) and made a safety plan (#17, #19, #20). It lists the protective factors: sister and cat (#16).
+2. Open **C001-S04**. The risk panel flags 「活著好累…消失算了」 (#10) as suicidal ideation, and keeps 「沒有真的想要怎麼做」 (#12) for review because it is negated. Its checklist shows the therapist asked about suicide (#11), frequency (#13), protective factors (#15) and made a safety plan (#17, #19, #20), and that access to means and past attempts were not discussed.
 3. Click any note sentence to jump to the transcript lines behind it.
-4. Red sentences show why they were flagged. Fix the date in "安排下週五提前會談" and the verifier clears it; click **確認無誤** on a correct paraphrase. **加入測試句** inserts a sentence that is not in the transcript to show it being caught. Signing stays blocked until every red sentence is fixed, removed or confirmed.
+4. Red sentences show why they were flagged. Rewrite "安排下週五提前會談" as "下次會談提前到這週五。" and the verifier clears it; click **確認無誤** on a correct paraphrase. **加入測試句** inserts a sentence that is not in the transcript to show it being caught. Signing stays blocked until every red sentence is fixed, removed or confirmed.
 5. Ask **「哪幾次提到父親？」** to search across sessions.
 
 ## Configuration
@@ -142,7 +144,10 @@ Targets to validate on the B70. These are goals, not measured results yet:
 - The rule-based engine and the risk lexicon are for the prototype. Lexicon matching misses indirect expressions; the Stage II LLM pass and psychologist-labelled test data address this.
 - The verifier's bigram overlap is a first filter. Paraphrased sentences are sent to the local LLM for a second check when one is running.
 - The not-on-track rule is a simple heuristic, not a validated expected-recovery curve.
-- Uploaded audio is not yet split by speaker.
+- Uploaded audio is not yet split by speaker. Until Stage II diarization, questions are treated as the therapist's and are not flagged as disclosures.
+- There is no login yet: the server only listens on the machine itself. A LAN deployment in Stage II needs therapist accounts, per-therapist access to clients and TLS.
+- The negation rule for risk sentences is deliberately strict and flags some correct sentences; the therapist confirms them.
+- The checklist detects whether a topic came up by keywords. It cannot judge the quality of the inquiry.
 
 ## References
 

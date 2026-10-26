@@ -22,12 +22,22 @@ def load_transcript(session_id: str) -> Transcript:
     )
 
 
-def transcribe_audio(audio_path: Path, session_id: str, client_id: str, session_no: int, date: str) -> Transcript:
-    """Runs faster-whisper locally. Speaker separation is left to Stage II (pyannote)."""
-    from faster_whisper import WhisperModel  # optional dependency
+_whisper = None
 
-    model = WhisperModel(config.ASR_MODEL, device="auto", compute_type="int8")
-    raw_segments, _info = model.transcribe(
+
+def _whisper_model():
+    """Loads the model once per process; loading takes longer than a short clip."""
+    global _whisper
+    if _whisper is None:
+        from faster_whisper import WhisperModel  # optional dependency
+
+        _whisper = WhisperModel(config.ASR_MODEL, device="auto", compute_type="int8")
+    return _whisper
+
+
+def transcribe_audio(audio_path: Path, session_id: str, client_id: str, session_no: int, date: str, simulated: bool = True) -> Transcript:
+    """Runs faster-whisper locally. Speaker separation is left to Stage II (pyannote)."""
+    raw_segments, _info = _whisper_model().transcribe(
         str(audio_path),
         language="zh",
         vad_filter=True,
@@ -37,7 +47,7 @@ def transcribe_audio(audio_path: Path, session_id: str, client_id: str, session_
         Segment(id=i, start=round(s.start, 1), end=round(s.end, 1), speaker="unknown", text=s.text.strip())
         for i, s in enumerate(raw_segments, start=1)
     ]
-    return Transcript(session_id, client_id, session_no, date, segments, simulated=True)
+    return Transcript(session_id, client_id, session_no, date, segments, simulated=simulated)
 
 
 def save_transcript(t: Transcript) -> Path:

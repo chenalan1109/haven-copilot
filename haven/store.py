@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from . import config
@@ -22,11 +23,22 @@ def _now() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
-def connect() -> sqlite3.Connection:
+class AlreadySignedError(Exception):
+    pass
+
+
+@contextmanager
+def connect():
+    """One transaction on a fresh connection, closed afterwards (sqlite3's own
+    context manager commits but leaves the connection open)."""
     config.DATA_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(config.DB_FILE)
-    conn.executescript(SCHEMA)
-    return conn
+    try:
+        conn.executescript(SCHEMA)
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 def audit(action: str, detail: str) -> None:
@@ -48,14 +60,19 @@ def get_result(session_id: str) -> dict | None:
     return json.loads(row[0]) if row else None
 
 
-def sign_note(session_id: str, note: dict, signed_by: str) -> dict:
+def sign_note(session_id: str, note: dict, signed_by: str, confirmed: int = 0) -> dict:
+    """Files a signed note. A signed note is part of the clinical record and is
+    never overwritten; corrections belong in a later addendum."""
     signed_at = _now()
-    with connect() as c:
-        c.execute(
-            "INSERT OR REPLACE INTO signed_notes VALUES (?, ?, ?, ?)",
-            (session_id, json.dumps(note, ensure_ascii=False), signed_by, signed_at),
-        )
-    audit("sign_note", f"{session_id} by {signed_by}")
+    try:
+        with connect() as c:
+            c.execute(
+                "INSERT INTO signed_notes VALUES (?, ?, ?, ?)",
+                (session_id, json.dumps(note, ensure_ascii=False), signed_by, signed_at),
+            )
+    except sqlite3.IntegrityError:
+        raise AlreadySignedError(session_id) from None
+    audit("sign_note", f"{session_id} by {signed_by}; {confirmed} flagged sentence(s) kept by therapist")
     return {"session_id": session_id, "signed_by": signed_by, "signed_at": signed_at}
 
 

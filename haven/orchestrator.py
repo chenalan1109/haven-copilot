@@ -12,7 +12,7 @@ from .agents.risk import RiskAgent
 from .agents.verifier import Verifier
 from .agents.writer import NoteWriter
 from .llm import get_llm
-from .models import to_dict
+from .models import NoteSentence, to_dict
 from .transcript import load_transcript
 
 
@@ -52,6 +52,11 @@ class Orchestrator:
         transcript = timed("asr", load_transcript, session_id)
         client = get_client(transcript.client_id)
         note = timed("writer", self.writer.run, transcript, template)
+        # Scores go into the objective section from the questionnaire data itself,
+        # so the model never restates (and never misstates) a number.
+        scores = [NoteSentence(s["text"], [], source="measure") for s in self.outcome.note_sentences(client, transcript.session_no)]
+        objective = "O" if template == "SOAP" else "D"
+        note.sections[objective] = scores + note.sections.get(objective, [])
         verification = timed("verifier", self.verifier.run, note, transcript)
         risk = timed("risk", self.risk.run, transcript)
         outcome = timed("outcome", self.outcome.run, client)

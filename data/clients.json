@@ -5,28 +5,90 @@
     "age": 27,
     "presenting_concern": "工作壓力、與父親的衝突、睡眠困擾",
     "therapist": "王心理師",
-    "consent": {"recording": true, "signed_on": "2026-09-22"},
+    "consent": {
+      "recording": true,
+      "signed_on": "2026-09-22"
+    },
     "scores": {
       "PHQ9": [
-        {"session": 1, "date": "2026-09-22", "score": 14},
-        {"session": 2, "date": "2026-09-29", "score": 15},
-        {"session": 3, "date": "2026-10-06", "score": 15},
-        {"session": 4, "date": "2026-10-20", "score": 18}
+        {
+          "session": 1,
+          "date": "2026-09-22",
+          "score": 14,
+          "item9": 0
+        },
+        {
+          "session": 2,
+          "date": "2026-09-29",
+          "score": 15,
+          "item9": 0
+        },
+        {
+          "session": 3,
+          "date": "2026-10-06",
+          "score": 15,
+          "item9": 0
+        },
+        {
+          "session": 4,
+          "date": "2026-10-20",
+          "score": 18,
+          "item9": 1
+        }
       ],
       "GAD7": [
-        {"session": 1, "date": "2026-09-22", "score": 11},
-        {"session": 2, "date": "2026-09-29", "score": 10},
-        {"session": 3, "date": "2026-10-06", "score": 11},
-        {"session": 4, "date": "2026-10-20", "score": 13}
+        {
+          "session": 1,
+          "date": "2026-09-22",
+          "score": 11
+        },
+        {
+          "session": 2,
+          "date": "2026-09-29",
+          "score": 10
+        },
+        {
+          "session": 3,
+          "date": "2026-10-06",
+          "score": 11
+        },
+        {
+          "session": 4,
+          "date": "2026-10-20",
+          "score": 13
+        }
       ],
       "BSRS5": [
-        {"session": 1, "date": "2026-09-22", "score": 9, "suicide_item": 0},
-        {"session": 2, "date": "2026-09-29", "score": 10, "suicide_item": 0},
-        {"session": 3, "date": "2026-10-06", "score": 10, "suicide_item": 1},
-        {"session": 4, "date": "2026-10-20", "score": 13, "suicide_item": 2}
+        {
+          "session": 1,
+          "date": "2026-09-22",
+          "score": 9,
+          "suicide_item": 0
+        },
+        {
+          "session": 2,
+          "date": "2026-09-29",
+          "score": 10,
+          "suicide_item": 0
+        },
+        {
+          "session": 3,
+          "date": "2026-10-06",
+          "score": 10,
+          "suicide_item": 1
+        },
+        {
+          "session": 4,
+          "date": "2026-10-20",
+          "score": 13,
+          "suicide_item": 2
+        }
       ]
     },
-    "sessions": ["C001-S03", "C001-S04"]
+    "sessions": [
+      "C001-S03",
+      "C001-S04"
+    ]
   },
   {
     "id": "C002",
@@ -34,28 +96,93 @@
     "age": 21,
     "presenting_concern": "社交焦慮、課業拖延",
     "therapist": "王心理師",
-    "consent": {"recording": true, "signed_on": "2026-09-15"},
+    "consent": {
+      "recording": true,
+      "signed_on": "2026-09-15"
+    },
     "scores": {
       "PHQ9": [
-        {"session": 1, "date": "2026-09-15", "score": 12},
-        {"session": 2, "date": "2026-09-22", "score": 10},
-        {"session": 3, "date": "2026-09-29", "score": 8},
-        {"session": 4, "date": "2026-10-06", "score": 6},
-        {"session": 5, "date": "2026-10-13", "score": 5}
+        {
+          "session": 1,
+          "date": "2026-09-15",
+          "score": 12,
+          "item9": 0
+        },
+        {
+          "session": 2,
+          "date": "2026-09-22",
+          "score": 10,
+          "item9": 0
+        },
+        {
+          "session": 3,
+          "date": "2026-09-29",
+          "score": 8,
+          "item9": 0
+        },
+        {
+          "session": 4,
+          "date": "2026-10-06",
+          "score": 6,
+          "item9": 0
+        },
+        {
+          "session": 5,
+          "date": "2026-10-13",
+          "score": 5,
+          "item9": 0
+        }
       ],
       "GAD7": [
-        {"session": 1, "date": "2026-09-15", "score": 15},
-        {"session": 2, "date": "2026-09-22", "score": 13},
-        {"session": 3, "date": "2026-09-29", "score": 11},
-        {"session": 4, "date": "2026-10-06", "score": 9},
-        {"session": 5, "date": "2026-10-13", "score": 8}
+        {
+          "session": 1,
+          "date": "2026-09-15",
+          "score": 15
+        },
+        {
+          "session": 2,
+          "date": "2026-09-22",
+          "score": 13
+        },
+        {
+          "session": 3,
+          "date": "2026-09-29",
+          "score": 11
+        },
+        {
+          "session": 4,
+          "date": "2026-10-06",
+          "score": 9
+        },
+        {
+          "session": 5,
+          "date": "2026-10-13",
+          "score": 8
+        }
       ],
       "BSRS5": [
-        {"session": 1, "date": "2026-09-15", "score": 11, "suicide_item": 0},
-        {"session": 3, "date": "2026-09-29", "score": 8, "suicide_item": 0},
-        {"session": 5, "date": "2026-10-13", "score": 5, "suicide_item": 0}
+        {
+          "session": 1,
+          "date": "2026-09-15",
+          "score": 11,
+          "suicide_item": 0
+        },
+        {
+          "session": 3,
+          "date": "2026-09-29",
+          "score": 8,
+          "suicide_item": 0
+        },
+        {
+          "session": 5,
+          "date": "2026-10-13",
+          "score": 5,
+          "suicide_item": 0
+        }
       ]
     },
-    "sessions": ["C002-S05"]
+    "sessions": [
+      "C002-S05"
+    ]
   }
 ]

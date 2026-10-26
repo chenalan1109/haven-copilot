@@ -26,6 +26,23 @@ LEXICON: dict[str, tuple[str, list[str]]] = {
 PROTECTIVE = ["不想讓", "妹妹", "弟弟", "家人", "朋友", "貓", "狗", "信仰", "孩子"]
 SCREENING = ["結束自己的生命", "傷害自己", "想死", "自殺的念頭"]
 SAFETY = ["安全計畫", "一九二五", "1925", "安心專線", "急診", "身心科", "提前"]
+
+# Elements of a suicide risk inquiry, after the structure of the Columbia
+# Suicide Severity Rating Scale and common safety-planning practice.
+# (item, therapist cues, client cues): an item counts as covered when the
+# therapist asked about it or the client spoke to it. Missing items are shown
+# as "consider asking or documenting", never as an error.
+CHECKLIST: list[tuple[str, list[str], list[str]]] = [
+    ("自殺意念", ["結束自己的生命", "想死", "自殺", "傷害自己", "不想活"], []),
+    ("頻率或強度", ["頻率", "多常", "多久一次", "幾次", "多強烈"], ["個晚上", "常常", "每天晚上"]),
+    ("計畫或方法", ["計畫要", "具體的計畫", "方法", "用什麼方式", "想過怎麼做"], ["怎麼做", "方法", "計畫"]),
+    ("意圖", ["打算", "會去做", "付諸行動", "意圖"], ["想要怎麼做", "打算", "會去做"]),
+    ("工具或手段可及性", ["藥", "工具", "繩", "炭", "拿得到", "手邊有"], ["存藥", "安眠藥", "買了", "木炭", "繩子"]),
+    ("過去自殺或自傷史", ["以前有沒有", "過去有沒有", "曾經", "之前有沒有"], ["以前有", "曾經"]),
+    ("保護因子", ["撐下來", "支持你", "重要的人", "活下去的理由"], ["不想讓"]),
+    ("安全計畫", ["安全計畫"], []),
+    ("危機資源或轉介", ["一九二五", "1925", "安心專線", "急診", "身心科", "精神科"], []),
+]
 _NEGATION = re.compile(r"(沒有|沒|不會|不是|從來沒)[^，。]{0,4}$")
 
 
@@ -34,11 +51,29 @@ def _negated(text: str, cue: str) -> bool:
     return bool(_NEGATION.search(text[max(0, i - 8) : i]))
 
 
+def checklist(t: Transcript) -> list[dict]:
+    """Which parts of a suicide risk inquiry appear in the session, with segment ids."""
+    out = []
+    for item, therapist_cues, client_cues in CHECKLIST:
+        covered = [
+            seg.id for seg in t.segments
+            if any(c in seg.text for c in (therapist_cues if seg.speaker != "client" else client_cues))
+        ]
+        out.append({"item": item, "covered": covered})
+    return out
+
+
+def _is_question(text: str) -> bool:
+    return text.rstrip().endswith(("？", "?"))
+
+
 class RiskAgent:
     def run(self, t: Transcript) -> RiskReport:
         report = RiskReport(level="none")
         for seg in t.segments:
-            if seg.speaker == "therapist":
+            # Without diarization (uploaded audio) a question is most likely the
+            # therapist screening, not the client disclosing.
+            if seg.speaker == "therapist" or (seg.speaker == "unknown" and _is_question(seg.text)):
                 if any(c in seg.text for c in SCREENING):
                     report.screening_asked.append(seg.id)
                 if any(c in seg.text for c in SAFETY):
@@ -57,4 +92,6 @@ class RiskAgent:
                     break
         if report.flags:
             report.level = max((f.level for f in report.flags), key=LEVEL_ORDER.__getitem__)
+        if any(f.category.startswith("自殺") or f.category == "自傷行為" for f in report.flags):
+            report.checklist = checklist(t)
         return report

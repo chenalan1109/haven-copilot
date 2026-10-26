@@ -40,6 +40,8 @@
         <form class="upload-form">
           <input type="text" name="session_id" placeholder="會談編號，例如 C001-S05" required pattern="[A-Za-z0-9-]{1,40}">
           <input type="file" name="audio" accept="audio/*" required>
+          <label><input type="checkbox" name="consent" required> 已取得個案錄音書面同意</label>
+          <label><input type="checkbox" name="simulated" checked> 模擬會談（非真實個案）</label>
           <button type="submit">轉寫並產生紀錄</button>
         </form>
         <p class="upload-msg"></p>

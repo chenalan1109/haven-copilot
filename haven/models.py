@@ -35,6 +35,9 @@ class NoteSentence:
     status: str = "unchecked"  # supported | weak | unsupported
     support: float = 0.0
     reason: str = ""
+    # "transcript": evidence is segment ids. "measure": the sentence is filled
+    # in from questionnaire scores, so there is no transcript line to cite.
+    source: str = "transcript"
 
 
 @dataclass
@@ -64,6 +67,8 @@ class RiskReport:
     protective: list[RiskFlag] = field(default_factory=list)
     screening_asked: list[int] = field(default_factory=list)
     safety_actions: list[int] = field(default_factory=list)
+    # Filled only when suicide or self-harm cues are present.
+    checklist: list[dict] = field(default_factory=list)
 
 
 def to_dict(obj) -> dict:

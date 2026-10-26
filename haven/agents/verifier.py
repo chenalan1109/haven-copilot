@@ -24,6 +24,10 @@ WEAK = 0.25
 _TIME = re.compile(r"這週|下週|上週|本週|今天|明天|昨天|下次|上次|每天|每週|週[一二三四五六日]")
 _NUMBER = re.compile(r"\d+|[零一二三四五六七八九十百兩]+(?=多?\s*(?:分|公斤|小時|天|次|點|週|個|年|月|歲|晚))")
 _PRONOUN = re.compile(r"[他她]")
+# Risk statements where a dropped or added negation reverses the meaning
+# ("沒有具體計畫" vs. "有具體計畫"). These are the sentences that matter most.
+_RISK_TERM = re.compile(r"自殺|結束生命|結束自己的生命|想死|自傷|傷害自己|計畫|工具|輕生")
+_NEGATION = re.compile(r"沒有|沒|不|未|否認|無")
 
 SYSTEM_PROMPT = "你是嚴謹的事實查核員。判斷「紀錄句子」是否能由「逐字稿」直接支持。只輸出 JSON。"
 
@@ -38,6 +42,8 @@ def rule_violation(sentence: str, source: str) -> str:
             return f"數字「{token}」不在引用的逐字稿中"
     if _PRONOUN.search(sentence) and not _PRONOUN.search(source):
         return "使用了逐字稿沒有的性別代名詞"
+    if _RISK_TERM.search(sentence) and bool(_NEGATION.search(sentence)) != bool(_NEGATION.search(source)):
+        return "風險相關句的否定語與逐字稿不一致，請確認語意沒有被反轉"
     return ""
 
 
@@ -62,6 +68,9 @@ class Verifier:
         sentences = note.sentences()
         for i, s in enumerate(sentences):
             if s.status != "unchecked":  # already checked and not edited since
+                continue
+            if s.source == "measure":  # filled in from scores, not from the transcript
+                s.status, s.support, s.reason = "supported", 1.0, ""
                 continue
             cited = [segs[e].text for e in s.evidence if e in segs]
             if not s.evidence:
@@ -89,8 +98,10 @@ class Verifier:
                     sentences[i].status, sentences[i].reason = "supported", ""
                 else:
                     sentences[i].reason = "本機模型判斷引用段落不足以支持此句"
-        n = len(sentences)
-        counts = {k: sum(1 for s in sentences if s.status == k) for k in ("supported", "weak", "unsupported")}
+        # Score lines are not claims about the session; leave them out of the ratio.
+        claims = [s for s in sentences if s.source != "measure"]
+        n = len(claims)
+        counts = {k: sum(1 for s in claims if s.status == k) for k in ("supported", "weak", "unsupported")}
         return {
             "total": n,
             **counts,

@@ -5,7 +5,8 @@
 const SECTION_NAMES = {
   S: "S 主觀資料", O: "O 客觀資料", A: "A 評估", P: "P 計畫", D: "D 資料",
 };
-const RISK_NAMES = { none: "未偵測到風險線索", review: "需要留意", high: "高度關注", critical: "立即評估" };
+// Describes the cues found in the transcript, not the client's risk level.
+const RISK_NAMES = { none: "未偵測到風險線索", review: "有需留意的線索", high: "有自殺或自傷等高關注線索", critical: "提及計畫或工具" };
 const STATUS_NAMES = { supported: "有逐字稿支持", weak: "支持不足", unsupported: "無支持證據" };
 const AGENT_NAMES = { asr: "轉寫", writer: "紀錄", verifier: "驗證", risk: "風險", outcome: "成效" };
 
@@ -27,6 +28,8 @@ function el(tag, attrs = {}, ...children) {
 }
 
 async function api(path, opts = {}) {
+  // The server refuses POSTs without this header (cross-site request protection).
+  if (opts.method === "POST") opts.headers = { ...(opts.headers || {}), "X-Haven": "1" };
   const res = await fetch(path, opts);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || res.statusText);
@@ -73,7 +76,7 @@ function chart(m) {
   const pts = m.history;
   const xs = (i) => pad + (pts.length === 1 ? 0 : (i * (w - 2 * pad)) / (pts.length - 1));
   const ys = (v) => h - pad - (v / m.max) * (h - 2 * pad);
-  const color = m.status === "deteriorated" ? "var(--bad)" : m.status === "not_on_track" ? "var(--warn)" : m.status === "improved" ? "var(--good)" : "var(--accent)";
+  const color = m.status === "deteriorated" ? "var(--bad)" : m.status === "not_on_track" ? "var(--warn)" : ["improved", "recovered"].includes(m.status) ? "var(--good)" : "var(--accent)";
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
@@ -115,6 +118,9 @@ async function openClient(id) {
   frag.querySelector(".alerts").append(...(alerts.length
     ? alerts.map((a) => el("div", { class: `alert ${a.status}` }, `${a.name}：${a.message}`))
     : [el("div", { class: "alert ok" }, "量表追蹤：目前無警示")]));
+  // One prompt for all not-improving measures, so it is read rather than skimmed.
+  const review = alerts.find((a) => a.review);
+  if (review) frag.querySelector(".alerts").append(el("div", { class: "review" }, `建議：${review.review}`));
   frag.querySelector(".charts").append(...brief.outcome.measures.map(chart));
 
   if (brief.last_session) {
@@ -135,7 +141,8 @@ async function openClient(id) {
     const file = upForm.audio.files[0];
     upMsg.textContent = "本機轉寫中，請稍候…";
     try {
-      const r = await api(`/api/upload?client=${encodeURIComponent(id)}&session_id=${encodeURIComponent(upForm.session_id.value)}`, {
+      const q = new URLSearchParams({ client: id, session_id: upForm.session_id.value, consent: upForm.consent.checked ? "1" : "0", simulated: upForm.simulated.checked ? "1" : "0" });
+      const r = await api(`/api/upload?${q}`, {
         method: "POST", headers: { "X-Filename": file.name }, body: file,
       });
       upMsg.textContent = "完成，錄音已刪除。";
@@ -189,6 +196,7 @@ function collectNote() {
       return {
         text,
         evidence: JSON.parse(s.dataset.evidence),
+        source: s.dataset.source || "transcript",
         // Unedited sentences keep their check; edited ones go back to the verifier.
         status: edited ? "unchecked" : s.dataset.status,
         support: edited ? 0 : Number(s.dataset.support || 0),
@@ -213,6 +221,7 @@ function sentenceRow(s) {
     "data-orig": s.text,
     "data-support": s.support ?? 0,
     "data-reason": s.reason || "",
+    "data-source": s.source || "transcript",
     title: STATUS_NAMES[s.status] || "",
   },
     el("div", { class: "body" },
@@ -222,7 +231,7 @@ function sentenceRow(s) {
         isConfirmed ? null : el("button", { class: "confirm", onclick: () => { confirmed.add(s.text); reverify(); } }, "確認無誤"),
       ) : null,
     ),
-    el("span", { class: "ev", onclick: () => highlight(s.evidence) }, s.evidence.length ? `#${s.evidence.join(", #")}` : "無來源"),
+    el("span", { class: "ev", onclick: () => highlight(s.evidence) }, s.source === "measure" ? "量表" : s.evidence.length ? `#${s.evidence.join(", #")}` : "無來源"),
   );
   return row;
 }
@@ -253,6 +262,7 @@ function renderNote(container, note, verification) {
 
 function renderSession(r, focusSeg) {
   currentSession = r;
+  confirmed.clear(); // confirmations belong to one note
   const main = document.getElementById("main");
   const riskSegs = new Set(r.risk.flags.map((f) => f.segment_id));
 
@@ -275,6 +285,11 @@ function renderSession(r, focusSeg) {
     risk.flags.length ? el("div", { class: "checks" },
       el("span", {}, risk.screening_asked.length ? `✓ 已詢問自殺意念（#${risk.screening_asked.join(", #")}）` : "✗ 逐字稿中未見自殺意念詢問"),
       el("span", {}, risk.safety_actions.length ? `✓ 已有安全措施（#${risk.safety_actions.join(", #")}）` : "✗ 未見安全計畫或轉介"),
+    ) : null,
+    risk.checklist.length ? el("div", { class: "checklist" },
+      el("div", { class: "checklist-title" }, "自殺風險評估要素（逐字稿中是否談到）"),
+      risk.checklist.map((c) => el("span", { class: c.covered.length ? "done" : "missing" },
+        c.covered.length ? `✓ ${c.item}（#${c.covered.join(", #")}）` : `○ ${c.item}：可考慮補問或補記`)),
     ) : null,
     el("div", { class: "disclaimer" }, "提示僅供參考，不取代心理師的臨床判斷；未標示不代表沒有風險。"),
   );
@@ -332,10 +347,16 @@ function addTestSentence() {
 async function sign() {
   const by = prompt("簽核心理師姓名", "王心理師");
   if (!by) return;
-  const r = await api(`/api/sessions/${currentSession.session_id}/sign`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ signed_by: by, note: collectNote() }),
-  });
+  let r;
+  try {
+    r = await api(`/api/sessions/${currentSession.session_id}/sign`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ signed_by: by, note: collectNote() }),
+    });
+  } catch (err) {
+    document.getElementById("sign-status").textContent = `無法簽核：${err.message}`;
+    return;
+  }
   currentSession.signature = r;
   document.getElementById("sign-status").replaceChildren(el("span", { class: "signed" }, `已由 ${r.signed_by} 於 ${r.signed_at} 簽核`));
   document.getElementById("sign-btn").disabled = true;

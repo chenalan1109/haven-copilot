@@ -13,13 +13,13 @@ from ..textutil import third_person
 
 TEMPLATES = {
     "SOAP": {
-        "S": "主觀資料（個案自述的困擾、感受、症狀）",
-        "O": "客觀資料（可觀察或可量化的事實，如自評分數、睡眠時數、體重變化）",
+        "S": "主觀資料（個案自述的困擾、感受、症狀、睡眠、體重、作業完成情形）",
+        "O": "客觀資料（心理師在會談中說出的觀察，例如情緒表現、會談中的行為；量表分數由系統自動填入，不要寫；沒有就留空陣列）",
         "A": "評估（心理師的觀察、概念化與介入重點）",
         "P": "計畫（作業、下次會談安排、轉介、安全措施）",
     },
     "DAP": {
-        "D": "資料（個案自述與可觀察的事實）",
+        "D": "資料（個案自述與心理師在會談中說出的觀察；量表分數由系統自動填入，不要寫）",
         "A": "評估（心理師的觀察、概念化與介入重點）",
         "P": "計畫（作業、下次會談安排、轉介、安全措施）",
     },
@@ -29,6 +29,8 @@ SYSTEM_PROMPT = (
     "你是協助台灣心理師撰寫會談紀錄的助理。只能根據逐字稿內容撰寫，不可加入逐字稿沒有的資訊，"
     "不可做診斷。使用繁體中文，以第三人稱稱呼「個案」，不要用他或她。每一句都必須附上支持它的逐字稿段落編號，"
     "且句中每個事實都要出現在那些段落裡。日期、次數、時間詞照逐字稿原文寫，不可推測變化趨勢。"
+    "個案說「沒有」的事要保留否定，例如「沒有具體計畫」不可寫成「有計畫」。"
+    "評估欄只寫心理師在會談中表達的看法，不要自行下結論或做風險分級。"
 )
 
 
@@ -90,14 +92,12 @@ def _therapist_clauses(text: str) -> list[tuple[str, str]]:
 
 
 def _rule_based(t: Transcript, template: str) -> dict[str, list[NoteSentence]]:
-    s_items, o_items, a_items, p_items = [], [], [], []
+    s_items, a_items, p_items = [], [], []
     for seg in t.segments:
         text = third_person(seg.text, seg.speaker)
         if seg.speaker == "client":
             body = text[2:] if text.startswith("個案") else text
-            if any(k in seg.text for k in _MEASURE) and any(ch.isdigit() or ch in "一二三四五六七八九十百" for ch in seg.text):
-                o_items.append(NoteSentence(f"個案自述{body}。", [seg.id]))
-            elif any(k in seg.text for k in _FEELING) and len(seg.text) > 6:
+            if any(k in seg.text for k in _FEELING + _MEASURE) and len(seg.text) > 6:
                 s_items.append(NoteSentence(f"個案表示{body}。", [seg.id]))
         elif seg.speaker == "therapist":
             for section, clause in _therapist_clauses(seg.text):
@@ -107,8 +107,8 @@ def _rule_based(t: Transcript, template: str) -> dict[str, list[NoteSentence]]:
                 else:
                     a_items.append(NoteSentence(f"心理師指出：{clause}。", [seg.id]))
     if template == "DAP":
-        return {"D": (s_items + o_items)[:7], "A": a_items[:4], "P": p_items[:5]}
-    return {"S": s_items[:5], "O": o_items[:4], "A": a_items[:4], "P": p_items[:5]}
+        return {"D": s_items[:6], "A": a_items[:4], "P": p_items[:5]}
+    return {"S": s_items[:6], "O": [], "A": a_items[:4], "P": p_items[:5]}
 
 
 class NoteWriter:

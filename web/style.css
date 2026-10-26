@@ -120,6 +120,11 @@ main { padding: 20px; min-width: 0; }
 .flag { font-size: 13px; padding: 4px 0; cursor: pointer; }
 .flag b { margin-right: 6px; }
 .checks { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; margin-top: 6px; }
+.checklist { display: flex; gap: 4px 12px; flex-wrap: wrap; font-size: 13px; margin-top: 8px; }
+.checklist-title { width: 100%; font-weight: 600; }
+.checklist .missing { color: var(--warn); }
+.alerts .review { font-size: 13px; color: var(--muted); padding: 0 4px; }
+.upload-form label { font-size: 13px; display: block; }
 .note-section h4 { margin: 12px 0 4px; font-size: 14px; color: var(--accent); }
 .sentence {
   display: flex; gap: 8px; align-items: flex-start; padding: 5px 6px; border-radius: 6px; font-size: 14px;

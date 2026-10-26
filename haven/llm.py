@@ -20,6 +20,11 @@ class NonLocalEndpointError(ValueError):
     pass
 
 
+# urllib honours HTTP(S)_PROXY and the macOS system proxy, which would send
+# session text through a proxy server. Haven's requests never use one.
+_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
 def assert_local(url: str) -> None:
     host = urlparse(url).hostname or ""
     if host in ("localhost",) or host.endswith(".local"):
@@ -44,7 +49,7 @@ class OllamaLLM:
 
     def available(self) -> bool:
         try:
-            with urllib.request.urlopen(f"{self.url}/api/tags", timeout=2) as r:
+            with _OPENER.open(f"{self.url}/api/tags", timeout=2) as r:
                 tags = json.load(r)
         except (urllib.error.URLError, TimeoutError, OSError):
             return False
@@ -68,7 +73,7 @@ class OllamaLLM:
             headers={"Content-Type": "application/json"},
         )
         try:
-            with urllib.request.urlopen(req, timeout=config.LLM_TIMEOUT) as r:
+            with _OPENER.open(req, timeout=config.LLM_TIMEOUT) as r:
                 content = json.load(r)["message"]["content"]
             return json.loads(content)
         except (urllib.error.URLError, TimeoutError, OSError, KeyError, json.JSONDecodeError):
