@@ -117,13 +117,18 @@ class Handler(BaseHTTPRequestHandler):
                 result["signature"] = None
                 return self._json(result)
             if len(parts) == 4 and parts[1] == "sessions" and parts[3] == "verify":
-                # Re-checks a note the therapist edited, against the same transcript.
+                # Re-checks the sentences the therapist edited (sent as "unchecked"); the rest keep their result.
                 payload = json.loads(self._body() or b"{}")
                 note = Note(
                     template=payload["template"],
                     engine=payload.get("engine", ""),
-                    sections={k: [NoteSentence(text=s["text"], evidence=[int(e) for e in s.get("evidence", [])]) for s in v]
-                              for k, v in payload["sections"].items()},
+                    sections={k: [NoteSentence(
+                        text=s["text"],
+                        evidence=[int(e) for e in s.get("evidence", [])],
+                        status=s.get("status", "unchecked"),
+                        support=float(s.get("support", 0.0)),
+                        reason=s.get("reason", ""),
+                    ) for s in v] for k, v in payload["sections"].items()},
                 )
                 verification = ORCH.verifier.run(note, load_transcript(parts[2]))
                 return self._json({"note": to_dict(note), "verification": verification})

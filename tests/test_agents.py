@@ -43,6 +43,21 @@ class VerifierTest(unittest.TestCase):
         self.assertEqual(self.check("個案睡眠很差。", [])[0], "unsupported")
         self.assertEqual(self.check("個案睡眠很差。", [4, 999])[0], "unsupported")
 
+    def test_wrong_time_word_is_caught(self):
+        # Seen from qwen2.5:7b: the session says "這週五", the note said "下週五".
+        t = load_transcript("C001-S04")
+        note = Note("SOAP", {"P": [NoteSentence("心理師建議個案下週五提前會談。", [19])]}, "test")
+        Verifier().run(note, t)
+        s = note.sections["P"][0]
+        self.assertEqual(s.status, "unsupported")
+        self.assertIn("下週", s.reason)
+
+    def test_rule_violations(self):
+        from haven.agents.verifier import rule_violation
+        self.assertIn("數字", rule_violation("個案瘦了五公斤。", "這兩週瘦了三公斤"))
+        self.assertIn("代名詞", rule_violation("妹妹是她的支持。", "我妹妹吧"))
+        self.assertEqual(rule_violation("個案瘦了三公斤。", "這兩週瘦了三公斤"), "")
+
     def test_rule_based_notes_pass_verification(self):
         for sid in ("C001-S03", "C001-S04", "C002-S05"):
             t = load_transcript(sid)

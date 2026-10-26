@@ -34,6 +34,7 @@ class NoteSentence:
     # Filled in by the verifier agent.
     status: str = "unchecked"  # supported | weak | unsupported
     support: float = 0.0
+    reason: str = ""
 
 
 @dataclass

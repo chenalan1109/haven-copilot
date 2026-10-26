@@ -183,20 +183,56 @@ function highlight(ids) {
 function collectNote() {
   const sections = {};
   document.querySelectorAll(".note-section").forEach((sec) => {
-    sections[sec.dataset.key] = [...sec.querySelectorAll(".sentence")].map((s) => ({
-      text: s.querySelector(".txt").textContent.trim(),
-      evidence: JSON.parse(s.dataset.evidence),
-    })).filter((s) => s.text);
+    sections[sec.dataset.key] = [...sec.querySelectorAll(".sentence")].map((s) => {
+      const text = s.querySelector(".txt").textContent.trim();
+      const edited = text !== s.dataset.orig;
+      return {
+        text,
+        evidence: JSON.parse(s.dataset.evidence),
+        // Unedited sentences keep their check; edited ones go back to the verifier.
+        status: edited ? "unchecked" : s.dataset.status,
+        support: edited ? 0 : Number(s.dataset.support || 0),
+        reason: edited ? "" : (s.dataset.reason || ""),
+        confirmed_by_therapist: confirmed.has(text),
+      };
+    }).filter((s) => s.text);
   });
   return { template: currentSession.note.template, engine: currentSession.note.engine, sections };
 }
 
+// Flagged sentences the therapist has checked and kept as written.
+const confirmed = new Set();
+
 function sentenceRow(s) {
-  const row = el("div", { class: `sentence ${s.status}`, "data-evidence": JSON.stringify(s.evidence), title: STATUS_NAMES[s.status] || "" },
-    el("span", { class: "txt", contenteditable: "true", onfocus: () => highlight(s.evidence) }, s.text),
+  const flagged = s.status === "weak" || s.status === "unsupported";
+  const isConfirmed = flagged && confirmed.has(s.text);
+  const row = el("div", {
+    class: `sentence ${isConfirmed ? "confirmed" : s.status}`,
+    "data-evidence": JSON.stringify(s.evidence),
+    "data-status": s.status,
+    "data-orig": s.text,
+    "data-support": s.support ?? 0,
+    "data-reason": s.reason || "",
+    title: STATUS_NAMES[s.status] || "",
+  },
+    el("div", { class: "body" },
+      el("span", { class: "txt", contenteditable: "true", onfocus: () => highlight(s.evidence) }, s.text),
+      flagged ? el("div", { class: "reason" },
+        isConfirmed ? "心理師已確認" : s.reason,
+        isConfirmed ? null : el("button", { class: "confirm", onclick: () => { confirmed.add(s.text); reverify(); } }, "確認無誤"),
+      ) : null,
+    ),
     el("span", { class: "ev", onclick: () => highlight(s.evidence) }, s.evidence.length ? `#${s.evidence.join(", #")}` : "無來源"),
   );
   return row;
+}
+
+function rerenderNote() {
+  renderNote(document.querySelector(".note-section").parentElement, currentSession.note, currentSession.verification);
+}
+
+function blockingCount(note) {
+  return Object.values(note.sections).flat().filter((s) => s.status === "unsupported" && !confirmed.has(s.text)).length;
 }
 
 function renderNote(container, note, verification) {
@@ -206,11 +242,13 @@ function renderNote(container, note, verification) {
       items.length ? items.map(sentenceRow) : el("div", { class: "sentence", "data-evidence": "[]" }, el("span", { class: "txt", contenteditable: "true" }, "")),
     )),
   );
+  const blocking = blockingCount(note);
   const bar = document.getElementById("verify-summary");
   bar.textContent = `驗證 agent：${verification.supported}/${verification.total} 句有逐字稿支持` +
     (verification.weak ? `，${verification.weak} 句支持不足` : "") +
-    (verification.unsupported ? `，${verification.unsupported} 句無支持證據（需修改或刪除才能簽核）` : "");
-  document.getElementById("sign-btn").disabled = !verification.ready_to_sign || !!currentSession.signature;
+    (verification.unsupported ? `，${verification.unsupported} 句無支持證據` : "") +
+    (blocking ? `（尚有 ${blocking} 句需修改、刪除或確認才能簽核）` : "");
+  document.getElementById("sign-btn").disabled = blocking > 0 || !!currentSession.signature;
 }
 
 function renderSession(r, focusSeg) {
@@ -264,7 +302,7 @@ function renderSession(r, focusSeg) {
       el("h2", {}, `${r.session_id}・第 ${r.session_no} 次會談・${r.date}`),
     ),
     el("div", { class: "timings" },
-      Object.entries(r.timings_ms).map(([k, v]) => el("span", {}, `${AGENT_NAMES[k] || k} ${v} ms`)),
+      Object.entries(r.timings_ms).map(([k, v]) => el("span", {}, `${AGENT_NAMES[k] || k} ${v >= 1000 ? `${(v / 1000).toFixed(1)} s` : `${v} ms`}`)),
       el("span", {}, r.engine),
     ),
   );
@@ -281,7 +319,7 @@ async function reverify() {
   });
   currentSession.note = r.note;
   currentSession.verification = r.verification;
-  renderNote(document.querySelector(".note-section").parentElement, r.note, r.verification);
+  rerenderNote();
 }
 
 function addTestSentence() {

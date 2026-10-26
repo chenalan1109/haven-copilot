@@ -33,7 +33,7 @@ flowchart LR
 | --- | --- | --- |
 | ASR | Speech to timestamped segments (faster-whisper, int8) | `haven/transcript.py` |
 | Note writer | Drafts SOAP or DAP notes; every sentence cites segment ids | `haven/agents/writer.py` |
-| Verifier | Checks each sentence against the segments it cites; unsupported sentences block signing | `haven/agents/verifier.py` |
+| Verifier | Checks each sentence against the segments it cites, in three layers: hard rules (numbers, time words and gendered pronouns must appear in the cited lines), word overlap, then one batched local-LLM check for paraphrases. Unsupported sentences block signing until the therapist edits, deletes or confirms them | `haven/agents/verifier.py` |
 | Risk | Flags suicide, self-harm, violence and functioning cues with the exact quote; keeps negated cues for review; checks whether screening and safety steps appear in the session | `haven/agents/risk.py` |
 | Outcome | Routine outcome monitoring: reliable change (PHQ-9: 6, GAD-7: 4), not-on-track heuristic, BSRS-5 suicide-item alert | `haven/agents/outcome.py` |
 | Case memory | Answers "which sessions mentioned her father?" from that client's own sessions only | `haven/agents/memory.py` |
@@ -68,6 +68,22 @@ HAVEN_LLM=ollama HAVEN_MODEL=qwen2.5:7b python3 -m haven
 
 Any server with Ollama's `/api/chat` API on the local machine or LAN works (`HAVEN_LLM_URL`).
 
+Generating a note takes about a minute on a laptop, so process the demo sessions before recording:
+
+```bash
+python3 scripts/prepare_demo.py
+```
+
+**Measured on a MacBook Air M2 (8GB) with qwen2.5:7b** (simulated sessions of about 2–4 minutes of speech):
+
+| Session | Total time | Sentences backed by the transcript |
+| --- | --- | --- |
+| C001-S03 | 59 s | 9 / 11 |
+| C001-S04 | 88 s | 12 / 15 |
+| C002-S05 | 68 s | 6 / 10 |
+
+What the verifier caught in these runs: "下週五" where the session said "這週五", "近兩週" attached to a statement that had no time frame, and feelings ("自責") the cited line did not contain. It also flags some correct paraphrases; the therapist clears those with "確認無誤". A 7B model on a laptop is the floor; Stage II moves to a larger model on the Arc Pro B70.
+
 ### Transcribing real audio
 
 ```bash
@@ -88,7 +104,7 @@ python3 -m unittest discover -s tests -v
 1. **小安** shows four outcome alerts: PHQ-9, GAD-7 and BSRS-5 are not improving after 4 sessions, and the BSRS-5 suicide item scored 2.
 2. Open **C001-S04**. The risk panel flags 「活著好累…消失算了」 (#10) as suicidal ideation, and keeps 「沒有真的想要怎麼做」 (#12) for review because it is negated. It confirms the therapist asked about suicide (#11) and made a safety plan (#17, #19, #20). It lists the protective factors: sister and cat (#16).
 3. Click any note sentence to jump to the transcript lines behind it.
-4. Click **加入測試句** to insert a sentence that is not in the transcript. The verifier marks it red and signing is blocked until it is removed.
+4. Red sentences show why they were flagged. Fix the date in "安排下週五提前會談" and the verifier clears it; click **確認無誤** on a correct paraphrase. **加入測試句** inserts a sentence that is not in the transcript to show it being caught. Signing stays blocked until every red sentence is fixed, removed or confirmed.
 5. Ask **「哪幾次提到父親？」** to search across sessions.
 
 ## Configuration

@@ -77,10 +77,9 @@ class Orchestrator:
     def brief(self, client_id: str) -> dict:
         """Pre-session brief: last plan, last risk picture, outcome alerts."""
         client = get_client(client_id)
+        # Uses stored results only, so opening a client never waits on the model.
         sessions = client.get("sessions", [])
-        last = None
-        if sessions:
-            last = store.get_result(sessions[-1]) or self.process_session(sessions[-1])
+        last = store.get_result(sessions[-1]) if sessions else None
         plan = []
         if last:
             sections = last["note"]["sections"]
