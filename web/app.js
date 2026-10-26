@@ -343,6 +343,13 @@ async function sign() {
 
 loadStatus();
 loadClients().then(() => {
+  // ?session=C001-S04 opens a session directly (handy for demos and screenshots).
+  const params = new URLSearchParams(location.search);
   const first = document.querySelector("#client-list li");
-  if (first) openClient(first.dataset.id);
+  if (params.get("session")) {
+    markActive(params.get("session").split("-")[0]);
+    openSession(params.get("session"));
+  } else if (first) {
+    openClient(params.get("client") || first.dataset.id);
+  }
 });

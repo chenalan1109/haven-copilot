@@ -82,8 +82,10 @@ class Orchestrator:
         last = store.get_result(sessions[-1]) if sessions else None
         plan = []
         if last:
-            sections = last["note"]["sections"]
-            plan = [s["text"] for s in sections.get("P", [])]
+            # Prefer the signed note; otherwise show only sentences the verifier backed.
+            signed = store.get_signed_note(last["session_id"])
+            sections = (signed or last["note"])["sections"]
+            plan = [s["text"] for s in sections.get("P", []) if signed or s.get("status") == "supported"]
         return {
             "client": client,
             "last_session": last and {

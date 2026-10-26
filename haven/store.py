@@ -59,6 +59,12 @@ def sign_note(session_id: str, note: dict, signed_by: str) -> dict:
     return {"session_id": session_id, "signed_by": signed_by, "signed_at": signed_at}
 
 
+def get_signed_note(session_id: str) -> dict | None:
+    with connect() as c:
+        row = c.execute("SELECT note FROM signed_notes WHERE session_id = ?", (session_id,)).fetchone()
+    return json.loads(row[0]) if row else None
+
+
 def get_signature(session_id: str) -> dict | None:
     with connect() as c:
         row = c.execute("SELECT signed_by, signed_at FROM signed_notes WHERE session_id = ?", (session_id,)).fetchone()
