@@ -67,7 +67,7 @@ After the session, the risk agent flags that line with the exact quote. "No plan
 **Subtitle for the #19 line:** "Let's move our next session up to this Friday."
 
 **VO:**
-Scores come straight from the questionnaires, so the model never writes a number. Here the model wrote *next* Friday, but the therapist said *this* Friday. The verifier caught it. I fix it, it re-checks, and the server won't sign until every red sentence is fixed or kept.
+Scores come straight from the questionnaires, so the model never writes a number. Here the model wrote *next* Friday, but the therapist said *this* Friday. The verifier caught it. The therapist fixes it, it re-checks, and the server won't sign until every red sentence is fixed or kept.
 
 ## 2:22–2:40 · Architecture and hardware — slides 8 and 9
 
@@ -81,7 +81,7 @@ On a laptop, Haven already processes a short session in about a minute, and flag
 
 ## 2:52–3:00 · Close — slide 14
 
-**ON SCREEN:** GitHub link. End card: *Haven 心港 · [Team name]*. Small line underneath: *In Taiwan, the 1925 安心專線 is available 24 hours a day.*
+**ON SCREEN:** GitHub link. End card: *Haven 心港 · Team NTU心港*. Small line underneath: *In Taiwan, the 1925 安心專線 is available 24 hours a day.*
 
 **VO:**
 Haven: AI help for therapists, without the data ever leaving the room. Thank you.
@@ -91,6 +91,31 @@ Haven: AI help for therapists, without the data ever leaving the room. Thank you
 ## Notes
 
 - **Timing.** If you run long, cut the sentence about scores in the verifier part first. Never cut the checklist or the 下週五 fix: they carry the clinical and technical innovation.
-- **Actors.** Two people read #10–#12 from `python3 scripts/print_script.py C001-S04`. Record them as audio over the scrolling transcript if you'd rather not show faces.
+- **Actors.** Two people read #10–#12 from `python3 scripts/print_script.py C001-S04`. The clip is audio only, over the scrolling transcript.
 - **Pronunciation.** Say 小安 as "Xiǎo Ān". Say "B-seventy".
 - **Upload.** Upload to YouTube as **Unlisted**. Burn the subtitles in (CapCut works) or upload an .srt. Put the YouTube and GitHub links in the submission form.
+
+---
+
+## Audio to record (everything else is built from the deck and the app)
+
+The video is assembled from deck slides, screen captures of the prototype, captions and these audio files. Nobody appears on camera. Record in a quiet room with a phone held about 20 cm away, as WAV or M4A. Leave 1 second of silence before and after each take. One file per row, named as shown.
+
+| File | Who | Content | Length |
+|---|---|---|---|
+| `vo-01-hook.m4a` | Narrator | 0:00–0:12 VO | ~10 s |
+| `vo-02-problem.m4a` | Narrator | 0:12–0:38 VO | ~24 s |
+| `vo-03-solution.m4a` | Narrator | 0:38–0:55 VO | ~16 s |
+| `vo-04-brief.m4a` | Narrator | 0:55–1:08 VO | ~12 s |
+| `clip-10-client.m4a` | Client voice | Line #10 in Chinese | ~6 s |
+| `clip-11-therapist.m4a` | Therapist voice | Line #11 in Chinese | ~5 s |
+| `clip-12-client.m4a` | Client voice | Line #12 in Chinese | ~6 s |
+| `vo-05-risk.m4a` | Narrator | 1:33–1:58 VO | ~23 s |
+| `vo-06-verifier.m4a` | Narrator | 1:58–2:22 VO | ~22 s |
+| `vo-07-hardware.m4a` | Narrator | 2:22–2:40 VO | ~16 s |
+| `vo-08-results.m4a` | Narrator | 2:40–2:52 VO | ~11 s |
+| `vo-09-close.m4a` | Narrator | 2:52–3:00 VO | ~6 s |
+
+- The narrator and the client voice can be the same person, but the therapist voice should be the other team member, so the clip sounds like two people.
+- Read the client lines slowly and quietly. Don't act distress; the words carry it.
+- If a VO file runs longer than its length, that's fine: the visuals are timed to the audio afterwards, and the "Timing" note says what to cut.

@@ -149,11 +149,18 @@ Targets to validate on the B70. These are goals, not measured results yet:
 - The negation rule for risk sentences is deliberately strict and flags some correct sentences; the therapist confirms them.
 - The checklist detects whether a topic came up by keywords. It cannot judge the quality of the inquiry.
 
+## Team
+
+Team **NTU心港**, two members, for the ASUS UGen AI League 2026:
+
+- Product and clinical concept
+- Software and hardware
+
 ## References
 
 - Psychologists Act (心理師法), Art. 25.
 - Lambert, M. J., Whipple, J. L., & Kleinstäuber, M. (2018). Collecting and delivering progress feedback: A meta-analysis of routine outcome monitoring. *Psychotherapy, 55*(4).
-- Olson, K. D. et al. (2025). Use of ambient AI scribes and clinician burnout. *JAMA Network Open*.
+- Olson, K. D., Meeker, D., Troup, M., Barker, T. D., Nguyen, V. H., Manders, J. B., Stults, C. D., Jones, V. G., Shah, S. D., Shah, T., & Schwamm, L. H. (2025). Use of ambient AI scribes to reduce administrative burden and professional burnout. *JAMA Network Open, 8*(10), e2534976. https://doi.org/10.1001/jamanetworkopen.2025.34976
 
 ## License
 
