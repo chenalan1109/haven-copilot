@@ -1,0 +1,117 @@
+{
+  "label": "m2-air-openai-compat-qwen2.5-7b",
+  "date": "2026-11-03T01:24:16+08:00",
+  "engine": "openai-compat:qwen2.5:7b",
+  "llm_endpoint": "http://127.0.0.1:11434",
+  "machine": {
+    "system": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "processor": "arm",
+    "note": "MacBook Air M2, 8 GB"
+  },
+  "sequential": [
+    {
+      "session_id": "C001-S03",
+      "speech_seconds": 230.0,
+      "total_seconds": 108.7,
+      "agents_ms": {
+        "asr": 0.4,
+        "writer": 85548.1,
+        "verifier": 22856.2,
+        "risk": 5.4,
+        "outcome": 2.9
+      },
+      "llm_calls": 2,
+      "prompt_tokens": 1577,
+      "completion_tokens": 511,
+      "output_tokens_per_second": 4.7,
+      "sentences_supported": 10,
+      "sentences_total": 13,
+      "risk_level": "none"
+    },
+    {
+      "session_id": "C001-S04",
+      "speech_seconds": 232.0,
+      "total_seconds": 61.4,
+      "agents_ms": {
+        "asr": 35.1,
+        "writer": 47617.2,
+        "verifier": 13622.2,
+        "risk": 16.8,
+        "outcome": 0.0
+      },
+      "llm_calls": 2,
+      "prompt_tokens": 1313,
+      "completion_tokens": 468,
+      "output_tokens_per_second": 7.6,
+      "sentences_supported": 6,
+      "sentences_total": 12,
+      "risk_level": "high"
+    },
+    {
+      "session_id": "C002-S05",
+      "speech_seconds": 110.0,
+      "total_seconds": 64.8,
+      "agents_ms": {
+        "asr": 18.6,
+        "writer": 40461.2,
+        "verifier": 24084.5,
+        "risk": 6.4,
+        "outcome": 5.0
+      },
+      "llm_calls": 2,
+      "prompt_tokens": 1127,
+      "completion_tokens": 366,
+      "output_tokens_per_second": 5.7,
+      "sentences_supported": 7,
+      "sentences_total": 8,
+      "risk_level": "none"
+    }
+  ],
+  "median_session_seconds": 64.8,
+  "concurrent": {
+    "rooms": 2,
+    "wall_seconds": 221.7,
+    "slowest_session_seconds": 221.3,
+    "aggregate_output_tokens_per_second": 4.2,
+    "runs": [
+      {
+        "session_id": "C001-S03",
+        "speech_seconds": 230.0,
+        "total_seconds": 221.3,
+        "agents_ms": {
+          "asr": 29.1,
+          "writer": 158750.5,
+          "verifier": 62150.0,
+          "risk": 7.4,
+          "outcome": 6.8
+        },
+        "llm_calls": 2,
+        "prompt_tokens": 1465,
+        "completion_tokens": 439,
+        "output_tokens_per_second": 2.0,
+        "sentences_supported": 10,
+        "sentences_total": 11,
+        "risk_level": "none"
+      },
+      {
+        "session_id": "C001-S04",
+        "speech_seconds": 232.0,
+        "total_seconds": 190.5,
+        "agents_ms": {
+          "asr": 1.4,
+          "writer": 85292.3,
+          "verifier": 104858.4,
+          "risk": 23.7,
+          "outcome": 5.6
+        },
+        "llm_calls": 2,
+        "prompt_tokens": 1348,
+        "completion_tokens": 501,
+        "output_tokens_per_second": 2.6,
+        "sentences_supported": 9,
+        "sentences_total": 13,
+        "risk_level": "high"
+      }
+    ]
+  }
+}

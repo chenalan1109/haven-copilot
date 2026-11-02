@@ -139,5 +139,17 @@ class ProxyTest(unittest.TestCase):
         self.assertFalse([h for h in llm._OPENER.handlers if isinstance(h, urllib.request.ProxyHandler) and h.proxies])
 
 
+class OpenAICompatTest(unittest.TestCase):
+    def test_refuses_cloud_endpoint(self):
+        from haven import llm
+        with self.assertRaises(llm.NonLocalEndpointError):
+            llm.OpenAICompatLLM(url="https://api.openai.com")
+
+    def test_parses_fenced_json(self):
+        from haven import llm
+        self.assertEqual(llm._parse_json('```json\n{"a": 1}\n```'), {"a": 1})
+        self.assertIsNone(llm._parse_json("[1, 2]"))
+
+
 if __name__ == "__main__":
     unittest.main()

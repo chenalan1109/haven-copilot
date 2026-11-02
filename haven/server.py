@@ -108,7 +108,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({
                     "engine": ORCH.engine,
                     "bind": f"{config.HOST}:{config.PORT}",
-                    "llm_endpoint": config.LLM_URL if ORCH.llm else None,
+                    "llm_endpoint": ORCH.llm.url if ORCH.llm else None,
                     "cloud_calls": 0,
                 })
             if parts == ["api", "clients"]:

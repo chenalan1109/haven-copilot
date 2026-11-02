@@ -86,6 +86,24 @@ python3 scripts/prepare_demo.py
 
 Score lines filled in from the questionnaires are not counted. What the verifier caught in these runs: "下週五" where the session said "這週五", "近兩週" attached to a statement that had no time frame, and feelings ("自責") the cited line did not contain. It also flags some correct paraphrases; the therapist clears those with "確認無誤". A 7B model on a laptop is the floor; Stage II moves to a larger model on the Arc Pro B70.
 
+### On the Arc Pro B70 (Stage II)
+
+The B70 runs models through vLLM (XPU), llama.cpp (SYCL) or OpenVINO Model Server. All three serve the OpenAI chat API, so Haven talks to them the same way:
+
+```bash
+HAVEN_LLM=openai HAVEN_LLM_URL=http://127.0.0.1:8000 HAVEN_MODEL=<served model name> python3 -m haven
+```
+
+The endpoint check still applies: only this machine or the clinic LAN is accepted.
+
+### Measuring performance
+
+```bash
+python3 scripts/benchmark.py --rooms 4
+```
+
+Processes every demo session, then four at once (four therapy rooms), and writes per-agent times, token counts and tokens per second to `docs/benchmarks/`. It uses a throwaway database. Results so far are in [docs/benchmarks](docs/benchmarks).
+
 ### Transcribing real audio
 
 ```bash
@@ -113,8 +131,8 @@ python3 -m unittest discover -s tests -v
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `HAVEN_LLM` | `auto` | `auto` uses Ollama if the model is available, `demo` forces the rule-based engine, `ollama` requires the model |
-| `HAVEN_LLM_URL` | `http://127.0.0.1:11434` | Local model server; non-local addresses are refused |
+| `HAVEN_LLM` | `auto` | `auto` uses Ollama if the model is available, `demo` forces the rule-based engine, `ollama` requires the model, `openai` uses a local OpenAI-compatible server (vLLM, llama.cpp `llama-server`, OpenVINO Model Server) |
+| `HAVEN_LLM_URL` | `http://127.0.0.1:11434` (`:8000` for `openai`) | Local model server; non-local addresses are refused |
 | `HAVEN_MODEL` | `qwen2.5:7b` | Model name on the server |
 | `HAVEN_ASR_MODEL` | `small` | faster-whisper model size |
 | `HAVEN_HOST` / `HAVEN_PORT` | `127.0.0.1` / `8765` | Where the UI is served |

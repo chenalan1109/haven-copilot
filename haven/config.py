@@ -10,7 +10,8 @@ CLIENTS_FILE = DATA_DIR / "clients.json"
 DB_FILE = DATA_DIR / "haven.db"
 WEB_DIR = ROOT / "web"
 
-# "demo" runs the rule-based engine with no model; "ollama" uses a local LLM.
+# "demo" runs the rule-based engine with no model; "ollama" uses Ollama; "openai" uses a
+# local OpenAI-compatible server (vLLM, llama-server, OpenVINO Model Server) such as on the B70.
 LLM_BACKEND = os.environ.get("HAVEN_LLM", "auto")
 LLM_URL = os.environ.get("HAVEN_LLM_URL", "http://127.0.0.1:11434")
 LLM_MODEL = os.environ.get("HAVEN_MODEL", "qwen2.5:7b")
