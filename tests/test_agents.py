@@ -57,6 +57,21 @@ class VerifierTest(unittest.TestCase):
         self.assertIn("數字", rule_violation("個案瘦了五公斤。", "這兩週瘦了三公斤"))
         self.assertIn("代名詞", rule_violation("妹妹是她的支持。", "我妹妹吧"))
         self.assertEqual(rule_violation("個案瘦了三公斤。", "這兩週瘦了三公斤"), "")
+        self.assertIn("代名詞", rule_violation("他表示不想讓妹妹難過。", "我不想讓她難過"))
+        self.assertEqual(rule_violation("個案本週寫了兩次紀錄。", "這週你有試著做思考紀錄嗎？有寫了兩次"), "")
+
+    def test_llm_alone_cannot_clear_a_risk_sentence(self):
+        class YesLLM:
+            def generate_json(self, system, prompt):
+                return {"results": [{"id": i, "supported": True} for i in range(10)]}
+        t = load_transcript("C001-S04")
+        note = Note("SOAP", {"S": [NoteSentence("個案表示有時會想消失，但否認自殺意念。", [10])]}, "test")
+        Verifier(YesLLM()).run(note, t)
+        self.assertEqual(note.sections["S"][0].status, "weak")
+
+    def test_therapist_words_written_as_client_said(self):
+        status, _ = self.check("個案表示下週想練習向主管提出合理的工作量。", [17])
+        self.assertEqual(status, "unsupported")
 
     def test_rule_based_notes_pass_verification(self):
         for sid in ("C001-S03", "C001-S04", "C002-S05"):

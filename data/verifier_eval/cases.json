@@ -1,0 +1,459 @@
+{
+ "_about": "Verifier test set. Every sentence is written as a note sentence about the simulated sessions in data/sessions. label 'ok' = the cited lines support it (a flag is a false alarm); any other label = a known error type the verifier should flag. Clinical error types beyond these are to be added by the clinical lead.",
+ "labels": {
+  "ok": "supported paraphrase",
+  "number": "wrong number",
+  "time": "wrong time word",
+  "pronoun": "wrong gendered pronoun",
+  "negation": "risk statement with reversed meaning",
+  "contradiction": "states the opposite of what was said (non-risk)",
+  "fabrication": "content not in the session",
+  "speaker": "therapist's words attributed to the client",
+  "hedge": "hedged statement written as fact",
+  "intensity": "frequency or severity overstated",
+  "diagnosis": "clinical label or diagnosis not made in the session",
+  "citation": "true elsewhere but cites the wrong line"
+ },
+ "cases": [
+  {
+   "id": "V01",
+   "session_id": "C001-S03",
+   "evidence": [
+    2
+   ],
+   "text": "個案表示主管又交付新專案，每天加班到九點多才回家。",
+   "label": "ok"
+  },
+  {
+   "id": "V02",
+   "session_id": "C001-S03",
+   "evidence": [
+    4
+   ],
+   "text": "個案入睡需一個多小時，半夜三點多常醒來。",
+   "label": "ok"
+  },
+  {
+   "id": "V03",
+   "session_id": "C001-S03",
+   "evidence": [
+    6
+   ],
+   "text": "個案的父親上週來電，批評個案選錯工作。",
+   "label": "ok"
+  },
+  {
+   "id": "V04",
+   "session_id": "C001-S03",
+   "evidence": [
+    9,
+    10
+   ],
+   "text": "個案評估「我什麼都做不好」的想法強度約七十分（滿分一百）。",
+   "label": "ok"
+  },
+  {
+   "id": "V05",
+   "session_id": "C001-S03",
+   "evidence": [
+    11,
+    12
+   ],
+   "text": "個案本週完成兩次思考紀錄，寫完較冷靜，加班太晚時則沒力氣寫。",
+   "label": "ok"
+  },
+  {
+   "id": "V06",
+   "session_id": "C001-S03",
+   "evidence": [
+    16
+   ],
+   "text": "個案擔心拒絕會讓對方失望、覺得自己沒用。",
+   "label": "ok"
+  },
+  {
+   "id": "V07",
+   "session_id": "C001-S03",
+   "evidence": [
+    18
+   ],
+   "text": "本週作業：睡前十分鐘不看工作訊息，並再寫兩次與父親有關的思考紀錄。",
+   "label": "ok"
+  },
+  {
+   "id": "V08",
+   "session_id": "C001-S03",
+   "evidence": [
+    14,
+    16
+   ],
+   "text": "個案不敢拒絕主管，與面對父親時同樣怕對方失望。",
+   "label": "ok"
+  },
+  {
+   "id": "V09",
+   "session_id": "C001-S03",
+   "evidence": [
+    4
+   ],
+   "text": "個案入睡需兩個多小時，半夜三點多常醒來。",
+   "label": "number"
+  },
+  {
+   "id": "V10",
+   "session_id": "C001-S03",
+   "evidence": [
+    10
+   ],
+   "text": "個案評估該想法強度約八十分。",
+   "label": "number"
+  },
+  {
+   "id": "V11",
+   "session_id": "C001-S03",
+   "evidence": [
+    6
+   ],
+   "text": "個案的父親昨天來電批評其工作選擇。",
+   "label": "time"
+  },
+  {
+   "id": "V12",
+   "session_id": "C001-S03",
+   "evidence": [
+    17
+   ],
+   "text": "心理師與個案約定這週練習向主管提出合理工作量。",
+   "label": "time"
+  },
+  {
+   "id": "V13",
+   "session_id": "C001-S03",
+   "evidence": [
+    6
+   ],
+   "text": "她的父親上週來電，批評她選錯工作。",
+   "label": "pronoun"
+  },
+  {
+   "id": "V14",
+   "session_id": "C001-S03",
+   "evidence": [
+    12
+   ],
+   "text": "個案本週未完成任何思考紀錄。",
+   "label": "contradiction"
+  },
+  {
+   "id": "V15",
+   "session_id": "C001-S03",
+   "evidence": [
+    8
+   ],
+   "text": "個案表示對父親的批評感到無所謂。",
+   "label": "fabrication"
+  },
+  {
+   "id": "V16",
+   "session_id": "C001-S03",
+   "evidence": [
+    2
+   ],
+   "text": "個案表示主管對其工作表現相當肯定。",
+   "label": "fabrication"
+  },
+  {
+   "id": "V17",
+   "session_id": "C001-S03",
+   "evidence": [
+    17
+   ],
+   "text": "個案表示下週想練習向主管提出合理的工作量。",
+   "label": "speaker"
+  },
+  {
+   "id": "V18",
+   "session_id": "C001-S03",
+   "evidence": [
+    8
+   ],
+   "text": "個案確實什麼都做不好。",
+   "label": "hedge"
+  },
+  {
+   "id": "V19",
+   "session_id": "C001-S03",
+   "evidence": [
+    4
+   ],
+   "text": "個案符合失眠症診斷。",
+   "label": "diagnosis"
+  },
+  {
+   "id": "V20",
+   "session_id": "C001-S03",
+   "evidence": [
+    14
+   ],
+   "text": "個案每天加班到九點多才回家。",
+   "label": "citation"
+  },
+  {
+   "id": "V21",
+   "session_id": "C001-S04",
+   "evidence": [
+    6
+   ],
+   "text": "個案近兩週幾乎睡不著，瘦了三公斤，食不知味。",
+   "label": "ok"
+  },
+  {
+   "id": "V22",
+   "session_id": "C001-S04",
+   "evidence": [
+    12
+   ],
+   "text": "個案表示曾有結束生命的念頭，但沒有具體想怎麼做，多在夜晚獨處時出現。",
+   "label": "ok"
+  },
+  {
+   "id": "V23",
+   "session_id": "C001-S04",
+   "evidence": [
+    13,
+    14
+   ],
+   "text": "個案表示本週約有三、四個晚上出現該念頭。",
+   "label": "ok"
+  },
+  {
+   "id": "V24",
+   "session_id": "C001-S04",
+   "evidence": [
+    16
+   ],
+   "text": "個案表示妹妹與所養的貓是支撐的力量。",
+   "label": "ok"
+  },
+  {
+   "id": "V25",
+   "session_id": "C001-S04",
+   "evidence": [
+    19
+   ],
+   "text": "心理師提供一九二五安心專線與急診資訊，並將下次會談提前至這週五。",
+   "label": "ok"
+  },
+  {
+   "id": "V26",
+   "session_id": "C001-S04",
+   "evidence": [
+    20,
+    21
+   ],
+   "text": "心理師建議個案就診身心科評估睡眠與情緒，個案同意。",
+   "label": "ok"
+  },
+  {
+   "id": "V27",
+   "session_id": "C001-S04",
+   "evidence": [
+    12
+   ],
+   "text": "個案表示有具體的自殺計畫。",
+   "label": "negation"
+  },
+  {
+   "id": "V28",
+   "session_id": "C001-S04",
+   "evidence": [
+    12
+   ],
+   "text": "個案否認曾有結束生命的念頭。",
+   "label": "negation"
+  },
+  {
+   "id": "V29",
+   "session_id": "C001-S04",
+   "evidence": [
+    10
+   ],
+   "text": "個案表示有時會想消失，但否認自殺意念。",
+   "label": "negation"
+  },
+  {
+   "id": "V30",
+   "session_id": "C001-S04",
+   "evidence": [
+    14
+   ],
+   "text": "個案表示這週每天晚上都出現該念頭。",
+   "label": "intensity"
+  },
+  {
+   "id": "V31",
+   "session_id": "C001-S04",
+   "evidence": [
+    14
+   ],
+   "text": "個案表示這週大概有五、六個晚上出現該念頭。",
+   "label": "number"
+  },
+  {
+   "id": "V32",
+   "session_id": "C001-S04",
+   "evidence": [
+    6
+   ],
+   "text": "個案這兩週瘦了五公斤。",
+   "label": "number"
+  },
+  {
+   "id": "V33",
+   "session_id": "C001-S04",
+   "evidence": [
+    19
+   ],
+   "text": "心理師建議個案下週五提前會談。",
+   "label": "time"
+  },
+  {
+   "id": "V34",
+   "session_id": "C001-S04",
+   "evidence": [
+    16
+   ],
+   "text": "他表示不想讓妹妹難過。",
+   "label": "pronoun"
+  },
+  {
+   "id": "V35",
+   "session_id": "C001-S04",
+   "evidence": [
+    10
+   ],
+   "text": "個案表示經常想死。",
+   "label": "intensity"
+  },
+  {
+   "id": "V36",
+   "session_id": "C001-S04",
+   "evidence": [
+    17,
+    18
+   ],
+   "text": "個案已完成安全計畫並承諾不自傷。",
+   "label": "fabrication"
+  },
+  {
+   "id": "V37",
+   "session_id": "C001-S04",
+   "evidence": [
+    20,
+    21
+   ],
+   "text": "個案拒絕轉介身心科。",
+   "label": "contradiction"
+  },
+  {
+   "id": "V38",
+   "session_id": "C001-S04",
+   "evidence": [
+    8
+   ],
+   "text": "個案已完成睡前不看工作訊息的作業。",
+   "label": "contradiction"
+  },
+  {
+   "id": "V39",
+   "session_id": "C002-S05",
+   "evidence": [
+    1,
+    2
+   ],
+   "text": "個案本週在分組報告上台，起初手抖，後段較順。",
+   "label": "ok"
+  },
+  {
+   "id": "V40",
+   "session_id": "C002-S05",
+   "evidence": [
+    4
+   ],
+   "text": "個案上台前焦慮約八十分，報告後降至約四十分。",
+   "label": "ok"
+  },
+  {
+   "id": "V41",
+   "session_id": "C002-S05",
+   "evidence": [
+    8
+   ],
+   "text": "個案使用番茄鐘每天讀書兩個番茄鐘，五天中完成四天。",
+   "label": "ok"
+  },
+  {
+   "id": "V42",
+   "session_id": "C002-S05",
+   "evidence": [
+    11
+   ],
+   "text": "下週作業：在課堂主動發問一次，並記錄發問前後的焦慮分數。",
+   "label": "ok"
+  },
+  {
+   "id": "V43",
+   "session_id": "C002-S05",
+   "evidence": [
+    4
+   ],
+   "text": "個案上台前焦慮約九十分。",
+   "label": "number"
+  },
+  {
+   "id": "V44",
+   "session_id": "C002-S05",
+   "evidence": [
+    8
+   ],
+   "text": "個案五天都完成番茄鐘讀書。",
+   "label": "contradiction"
+  },
+  {
+   "id": "V45",
+   "session_id": "C002-S05",
+   "evidence": [
+    6
+   ],
+   "text": "同學在報告時嘲笑個案。",
+   "label": "contradiction"
+  },
+  {
+   "id": "V46",
+   "session_id": "C002-S05",
+   "evidence": [
+    10
+   ],
+   "text": "個案表示下週將在課堂上主動發問三次。",
+   "label": "number"
+  },
+  {
+   "id": "V47",
+   "session_id": "C002-S05",
+   "evidence": [
+    5
+   ],
+   "text": "個案表示焦慮會自己降下來。",
+   "label": "speaker"
+  },
+  {
+   "id": "V48",
+   "session_id": "C002-S05",
+   "evidence": [
+    2
+   ],
+   "text": "個案報告時恐慌發作。",
+   "label": "diagnosis"
+  }
+ ]
+}

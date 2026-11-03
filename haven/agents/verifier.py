@@ -3,6 +3,7 @@
 Three layers, cheapest first:
 1. Hard rules: the sentence must cite existing segments, and every number,
    time word and gendered pronoun in it must also appear in those segments.
+   "個案表示…" must cite at least one of the client's own lines.
    Small models get exactly these details wrong ("下週五" for "這週五").
 2. Lexical overlap between the sentence and its evidence.
 3. For paraphrases that pass the rules but overlap little, one batched call
@@ -24,6 +25,10 @@ WEAK = 0.25
 _TIME = re.compile(r"這週|下週|上週|本週|今天|明天|昨天|下次|上次|每天|每週|週[一二三四五六日]")
 _NUMBER = re.compile(r"\d+|[零一二三四五六七八九十百兩]+(?=多?\s*(?:分|公斤|小時|天|次|點|週|個|年|月|歲|晚))")
 _PRONOUN = re.compile(r"[他她]")
+# Same week, different wording; compared as one word.
+_SAME_TIME = {"本週": "這週", "這一週": "這週", "這個禮拜": "這週", "下禮拜": "下週", "上禮拜": "上週"}
+# The sentence says the client said it; at least one cited line must be the client's.
+_CLIENT_SAID = re.compile(r"^個案(?:表示|自述|提到|說)")
 # Risk statements where a dropped or added negation reverses the meaning
 # ("沒有具體計畫" vs. "有具體計畫"). These are the sentences that matter most.
 _RISK_TERM = re.compile(r"自殺|結束生命|結束自己的生命|想死|自傷|傷害自己|計畫|工具|輕生")
@@ -34,14 +39,17 @@ SYSTEM_PROMPT = "你是嚴謹的事實查核員。判斷「紀錄句子」是否
 
 def rule_violation(sentence: str, source: str) -> str:
     """Returns why the sentence states a detail its source does not, or ''."""
+    for word, same in _SAME_TIME.items():
+        sentence, source = sentence.replace(word, same), source.replace(word, same)
     for token in _TIME.findall(sentence):
         if token not in source:
             return f"時間詞「{token}」不在引用的逐字稿中"
     for token in _NUMBER.findall(sentence):
         if token not in source:
             return f"數字「{token}」不在引用的逐字稿中"
-    if _PRONOUN.search(sentence) and not _PRONOUN.search(source):
-        return "使用了逐字稿沒有的性別代名詞"
+    for token in set(_PRONOUN.findall(sentence)):
+        if token not in source:
+            return f"代名詞「{token}」不在引用的逐字稿中，請確認指的是誰"
     if _RISK_TERM.search(sentence) and bool(_NEGATION.search(sentence)) != bool(_NEGATION.search(source)):
         return "風險相關句的否定語與逐字稿不一致，請確認語意沒有被反轉"
     return ""
@@ -80,6 +88,9 @@ class Verifier:
                 s.status, s.support, s.reason = "unsupported", 0.0, "引用了不存在的段落"
                 continue
             source = "\n".join(cited)
+            if _CLIENT_SAID.search(s.text) and all(segs[e].speaker == "therapist" for e in s.evidence):
+                s.status, s.support, s.reason = "unsupported", 0.0, "句子寫個案表示，但引用的都是心理師的話"
+                continue
             s.support = round(max(overlap(s.text, c) for c in cited), 2)
             violation = rule_violation(s.text, source)
             if violation:
@@ -93,8 +104,12 @@ class Verifier:
         # Paraphrases score low on overlap; let the local model rule on them.
         if pending and self.llm is not None:
             accepted = self._llm_supported(pending)
-            for i, _, _ in pending:
-                if i in accepted:
+            for i, text, _ in pending:
+                if i in accepted and _RISK_TERM.search(text):
+                    # A 7B model accepted "否認自殺意念" for a line that never said it.
+                    # On risk sentences the model's yes is not enough on its own.
+                    sentences[i].status, sentences[i].reason = "weak", "風險相關句只有本機模型判斷支持，請心理師對照原句確認"
+                elif i in accepted:
                     sentences[i].status, sentences[i].reason = "supported", ""
                 else:
                     sentences[i].reason = "本機模型判斷引用段落不足以支持此句"

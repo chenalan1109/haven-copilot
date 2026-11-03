@@ -1,0 +1,656 @@
+{
+  "label": "rules-only",
+  "date": "2026-11-03T09:07:45+08:00",
+  "engine": "rules + overlap (no LLM)",
+  "summary": {
+    "errors": 30,
+    "errors_blocked": 22,
+    "errors_flagged": 26,
+    "correct": 18,
+    "correct_blocked": 5,
+    "correct_flagged": 13,
+    "per_label": {
+      "citation": {
+        "n": 1,
+        "blocked": 1,
+        "flagged": 1
+      },
+      "contradiction": {
+        "n": 5,
+        "blocked": 3,
+        "flagged": 5
+      },
+      "diagnosis": {
+        "n": 2,
+        "blocked": 2,
+        "flagged": 2
+      },
+      "fabrication": {
+        "n": 3,
+        "blocked": 3,
+        "flagged": 3
+      },
+      "hedge": {
+        "n": 1,
+        "blocked": 0,
+        "flagged": 0
+      },
+      "intensity": {
+        "n": 2,
+        "blocked": 2,
+        "flagged": 2
+      },
+      "negation": {
+        "n": 3,
+        "blocked": 2,
+        "flagged": 3
+      },
+      "number": {
+        "n": 6,
+        "blocked": 6,
+        "flagged": 6
+      },
+      "pronoun": {
+        "n": 2,
+        "blocked": 0,
+        "flagged": 1
+      },
+      "speaker": {
+        "n": 2,
+        "blocked": 0,
+        "flagged": 0
+      },
+      "time": {
+        "n": 3,
+        "blocked": 3,
+        "flagged": 3
+      }
+    }
+  },
+  "results": [
+    {
+      "id": "V01",
+      "session_id": "C001-S03",
+      "evidence": [
+        2
+      ],
+      "text": "個案表示主管又交付新專案，每天加班到九點多才回家。",
+      "label": "ok",
+      "status": "supported",
+      "support": 0.72,
+      "reason": ""
+    },
+    {
+      "id": "V02",
+      "session_id": "C001-S03",
+      "evidence": [
+        4
+      ],
+      "text": "個案入睡需一個多小時，半夜三點多常醒來。",
+      "label": "ok",
+      "status": "supported",
+      "support": 0.67,
+      "reason": ""
+    },
+    {
+      "id": "V03",
+      "session_id": "C001-S03",
+      "evidence": [
+        6
+      ],
+      "text": "個案的父親上週來電，批評個案選錯工作。",
+      "label": "ok",
+      "status": "weak",
+      "support": 0.33,
+      "reason": "與引用段落的用字重疊少，請確認"
+    },
+    {
+      "id": "V04",
+      "session_id": "C001-S03",
+      "evidence": [
+        9,
+        10
+      ],
+      "text": "個案評估「我什麼都做不好」的想法強度約七十分（滿分一百）。",
+      "label": "ok",
+      "status": "weak",
+      "support": 0.4,
+      "reason": "與引用段落的用字重疊少，請確認"
+    },
+    {
+      "id": "V05",
+      "session_id": "C001-S03",
+      "evidence": [
+        11,
+        12
+      ],
+      "text": "個案本週完成兩次思考紀錄，寫完較冷靜，加班太晚時則沒力氣寫。",
+      "label": "ok",
+      "status": "unsupported",
+      "support": 0.42,
+      "reason": "時間詞「本週」不在引用的逐字稿中"
+    },
+    {
+      "id": "V06",
+      "session_id": "C001-S03",
+      "evidence": [
+        16
+      ],
+      "text": "個案擔心拒絕會讓對方失望、覺得自己沒用。",
+      "label": "ok",
+      "status": "weak",
+      "support": 0.47,
+      "reason": "與引用段落的用字重疊少，請確認"
+    },
+    {
+      "id": "V07",
+      "session_id": "C001-S03",
+      "evidence": [
+        18
+      ],
+      "text": "本週作業：睡前十分鐘不看工作訊息，並再寫兩次與父親有關的思考紀錄。",
+      "label": "ok",
+      "status": "unsupported",
+      "support": 0.66,
+      "reason": "時間詞「本週」不在引用的逐字稿中"
+    },
+    {
+      "id": "V08",
+      "session_id": "C001-S03",
+      "evidence": [
+        14,
+        16
+      ],
+      "text": "個案不敢拒絕主管，與面對父親時同樣怕對方失望。",
+      "label": "ok",
+      "status": "weak",
+      "support": 0.28,
+      "reason": "與引用段落的用字重疊少，請確認"
+    },
+    {
+      "id": "V09",
+      "session_id": "C001-S03",
+      "evidence": [
+        4
+      ],
+      "text": "個案入睡需兩個多小時，半夜三點多常醒來。",
+      "label": "number",
+      "status": "unsupported",
+      "support": 0.6,
+      "reason": "數字「兩」不在引用的逐字稿中"
+    },
+    {
+      "id": "V10",
+      "session_id": "C001-S03",
+      "evidence": [
+        10
+      ],
+      "text": "個案評估該想法強度約八十分。",
+      "label": "number",
+      "status": "unsupported",
+      "support": 0.1,
+      "reason": "數字「八十」不在引用的逐字稿中"
+    },
+    {
+      "id": "V11",
+      "session_id": "C001-S03",
+      "evidence": [
+        6
+      ],
+      "text": "個案的父親昨天來電批評其工作選擇。",
+      "label": "time",
+      "status": "unsupported",
+      "support": 0.08,
+      "reason": "時間詞「昨天」不在引用的逐字稿中"
+    },
+    {
+      "id": "V12",
+      "session_id": "C001-S03",
+      "evidence": [
+        17
+      ],
+      "text": "心理師與個案約定這週練習向主管提出合理工作量。",
+      "label": "time",
+      "status": "unsupported",
+      "support": 0.5,
+      "reason": "時間詞「這週」不在引用的逐字稿中"
+    },
+    {
+      "id": "V13",
+      "session_id": "C001-S03",
+      "evidence": [
+        6
+      ],
+      "text": "她的父親上週來電，批評她選錯工作。",
+      "label": "pronoun",
+      "status": "weak",
+      "support": 0.33,
+      "reason": "與引用段落的用字重疊少，請確認"
+    },
+    {
+      "id": "V14",
+      "session_id": "C001-S03",
+      "evidence": [
+        12
+      ],
+      "text": "個案本週未完成任何思考紀錄。",
+      "label": "contradiction",
+      "status": "unsupported",
+      "support": 0.0,
+      "reason": "時間詞「本週」不在引用的逐字稿中"
+    },
+    {
+      "id": "V15",
+      "session_id": "C001-S03",
+      "evidence": [
+        8
+      ],
+      "text": "個案表示對父親的批評感到無所謂。",
+      "label": "fabrication",
+      "status": "unsupported",
+      "support": 0.0,
+      "reason": "與引用段落的用字重疊少，請確認"
+    },
+    {
+      "id": "V16",
+      "session_id": "C001-S03",
+      "evidence": [
+        2
+      ],
+      "text": "個案表示主管對其工作表現相當肯定。",
+      "label": "fabrication",
+      "status": "unsupported",
+      "support": 0.09,
+      "reason": "與引用段落的用字重疊少，請確認"
+    },
+    {
+      "id": "V17",
+      "session_id": "C001-S03",
+      "evidence": [
+        17
+      ],
+      "text": "個案表示下週想練習向主管提出合理的工作量。",
+      "label": "speaker",
+      "status": "supported",
+      "support": 0.73,
+      "reason": ""
+    },
+    {
+      "id": "V18",
+      "session_id": "C001-S03",
+      "evidence": [
+        8
+      ],
+      "text": "個案確實什麼都做不好。",
+      "label": "hedge",
+      "status": "supported",
+      "support": 0.71,
+      "reason": ""
+    },
+    {
+      "id": "V19",
+      "session_id": "C001-S03",
+      "evidence": [
+        4
+      ],
+      "text": "個案符合失眠症診斷。",
+      "label": "diagnosis",
+      "status": "unsupported",
+      "support": 0.0,
+      "reason": "與引用段落的用字重疊少，請確認"
+    },
+    {
+      "id": "V20",
+      "session_id": "C001-S03",
+      "evidence": [
+        14
+      ],
+      "text": "個案每天加班到九點多才回家。",
+      "label": "citation",
+      "status": "unsupported",
+      "support": 0.0,
+      "reason": "時間詞「每天」不在引用的逐字稿中"
+    },
+    {
+      "id": "V21",
+      "session_id": "C001-S04",
+      "evidence": [
+        6
+      ],
+      "text": "個案近兩週幾乎睡不著，瘦了三公斤，食不知味。",
+      "label": "ok",
+      "status": "supported",
+      "support": 0.56,
+      "reason": ""
+    },
+    {
+      "id": "V22",
+      "session_id": "C001-S04",
+      "evidence": [
+        12
+      ],
+      "text": "個案表示曾有結束生命的念頭，但沒有具體想怎麼做，多在夜晚獨處時出現。",
+      "label": "ok",
+      "status": "unsupported",
+      "support": 0.12,
+      "reason": "與引用段落的用字重疊少，請確認"
+    },
+    {
+      "id": "V23",
+      "session_id": "C001-S04",
+      "evidence": [
+        13,
+        14
+      ],
+      "text": "個案表示本週約有三、四個晚上出現該念頭。",
+      "label": "ok",
+      "status": "unsupported",
+      "support": 0.38,
+      "reason": "時間詞「本週」不在引用的逐字稿中"
+    },
+    {
+      "id": "V24",
+      "session_id": "C001-S04",
+      "evidence": [
+        16
+      ],
+      "text": "個案表示妹妹與所養的貓是支撐的力量。",
+      "label": "ok",
+      "status": "weak",
+      "support": 0.25,
+      "reason": "與引用段落的用字重疊少，請確認"
+    },
+    {
+      "id": "V25",
+      "session_id": "C001-S04",
+      "evidence": [
+        19
+      ],
+      "text": "心理師提供一九二五安心專線與急診資訊，並將下次會談提前至這週五。",
+      "label": "ok",
+      "status": "weak",
+      "support": 0.46,
+      "reason": "與引用段落的用字重疊少，請確認"
+    },
+    {
+      "id": "V26",
+      "session_id": "C001-S04",
+      "evidence": [
+        20,
+        21
+      ],
+      "text": "心理師建議個案就診身心科評估睡眠與情緒，個案同意。",
+      "label": "ok",
+      "status": "weak",
+      "support": 0.47,
+      "reason": "與引用段落的用字重疊少，請確認"
+    },
+    {
+      "id": "V27",
+      "session_id": "C001-S04",
+      "evidence": [
+        12
+      ],
+      "text": "個案表示有具體的自殺計畫。",
+      "label": "negation",
+      "status": "unsupported",
+      "support": 0.0,
+      "reason": "風險相關句的否定語與逐字稿不一致，請確認語意沒有被反轉"
+    },
+    {
+      "id": "V28",
+      "session_id": "C001-S04",
+      "evidence": [
+        12
+      ],
+      "text": "個案否認曾有結束生命的念頭。",
+      "label": "negation",
+      "status": "unsupported",
+      "support": 0.0,
+      "reason": "與引用段落的用字重疊少，請確認"
+    },
+    {
+      "id": "V29",
+      "session_id": "C001-S04",
+      "evidence": [
+        10
+      ],
+      "text": "個案表示有時會想消失，但否認自殺意念。",
+      "label": "negation",
+      "status": "weak",
+      "support": 0.25,
+      "reason": "與引用段落的用字重疊少，請確認"
+    },
+    {
+      "id": "V30",
+      "session_id": "C001-S04",
+      "evidence": [
+        14
+      ],
+      "text": "個案表示這週每天晚上都出現該念頭。",
+      "label": "intensity",
+      "status": "unsupported",
+      "support": 0.18,
+      "reason": "時間詞「每天」不在引用的逐字稿中"
+    },
+    {
+      "id": "V31",
+      "session_id": "C001-S04",
+      "evidence": [
+        14
+      ],
+      "text": "個案表示這週大概有五、六個晚上出現該念頭。",
+      "label": "number",
+      "status": "unsupported",
+      "support": 0.43,
+      "reason": "數字「六」不在引用的逐字稿中"
+    },
+    {
+      "id": "V32",
+      "session_id": "C001-S04",
+      "evidence": [
+        6
+      ],
+      "text": "個案這兩週瘦了五公斤。",
+      "label": "number",
+      "status": "unsupported",
+      "support": 0.71,
+      "reason": "數字「五」不在引用的逐字稿中"
+    },
+    {
+      "id": "V33",
+      "session_id": "C001-S04",
+      "evidence": [
+        19
+      ],
+      "text": "心理師建議個案下週五提前會談。",
+      "label": "time",
+      "status": "unsupported",
+      "support": 0.25,
+      "reason": "時間詞「下週」不在引用的逐字稿中"
+    },
+    {
+      "id": "V34",
+      "session_id": "C001-S04",
+      "evidence": [
+        16
+      ],
+      "text": "他表示不想讓妹妹難過。",
+      "label": "pronoun",
+      "status": "supported",
+      "support": 0.5,
+      "reason": ""
+    },
+    {
+      "id": "V35",
+      "session_id": "C001-S04",
+      "evidence": [
+        10
+      ],
+      "text": "個案表示經常想死。",
+      "label": "intensity",
+      "status": "unsupported",
+      "support": 0.0,
+      "reason": "風險相關句的否定語與逐字稿不一致，請確認語意沒有被反轉"
+    },
+    {
+      "id": "V36",
+      "session_id": "C001-S04",
+      "evidence": [
+        17,
+        18
+      ],
+      "text": "個案已完成安全計畫並承諾不自傷。",
+      "label": "fabrication",
+      "status": "unsupported",
+      "support": 0.1,
+      "reason": "風險相關句的否定語與逐字稿不一致，請確認語意沒有被反轉"
+    },
+    {
+      "id": "V37",
+      "session_id": "C001-S04",
+      "evidence": [
+        20,
+        21
+      ],
+      "text": "個案拒絕轉介身心科。",
+      "label": "contradiction",
+      "status": "weak",
+      "support": 0.33,
+      "reason": "與引用段落的用字重疊少，請確認"
+    },
+    {
+      "id": "V38",
+      "session_id": "C001-S04",
+      "evidence": [
+        8
+      ],
+      "text": "個案已完成睡前不看工作訊息的作業。",
+      "label": "contradiction",
+      "status": "unsupported",
+      "support": 0.0,
+      "reason": "與引用段落的用字重疊少，請確認"
+    },
+    {
+      "id": "V39",
+      "session_id": "C002-S05",
+      "evidence": [
+        1,
+        2
+      ],
+      "text": "個案本週在分組報告上台，起初手抖，後段較順。",
+      "label": "ok",
+      "status": "unsupported",
+      "support": 0.19,
+      "reason": "時間詞「本週」不在引用的逐字稿中"
+    },
+    {
+      "id": "V40",
+      "session_id": "C002-S05",
+      "evidence": [
+        4
+      ],
+      "text": "個案上台前焦慮約八十分，報告後降至約四十分。",
+      "label": "ok",
+      "status": "weak",
+      "support": 0.38,
+      "reason": "與引用段落的用字重疊少，請確認"
+    },
+    {
+      "id": "V41",
+      "session_id": "C002-S05",
+      "evidence": [
+        8
+      ],
+      "text": "個案使用番茄鐘每天讀書兩個番茄鐘，五天中完成四天。",
+      "label": "ok",
+      "status": "supported",
+      "support": 0.72,
+      "reason": ""
+    },
+    {
+      "id": "V42",
+      "session_id": "C002-S05",
+      "evidence": [
+        11
+      ],
+      "text": "下週作業：在課堂主動發問一次，並記錄發問前後的焦慮分數。",
+      "label": "ok",
+      "status": "supported",
+      "support": 0.78,
+      "reason": ""
+    },
+    {
+      "id": "V43",
+      "session_id": "C002-S05",
+      "evidence": [
+        4
+      ],
+      "text": "個案上台前焦慮約九十分。",
+      "label": "number",
+      "status": "unsupported",
+      "support": 0.38,
+      "reason": "數字「九十」不在引用的逐字稿中"
+    },
+    {
+      "id": "V44",
+      "session_id": "C002-S05",
+      "evidence": [
+        8
+      ],
+      "text": "個案五天都完成番茄鐘讀書。",
+      "label": "contradiction",
+      "status": "weak",
+      "support": 0.44,
+      "reason": "與引用段落的用字重疊少，請確認"
+    },
+    {
+      "id": "V45",
+      "session_id": "C002-S05",
+      "evidence": [
+        6
+      ],
+      "text": "同學在報告時嘲笑個案。",
+      "label": "contradiction",
+      "status": "unsupported",
+      "support": 0.14,
+      "reason": "與引用段落的用字重疊少，請確認"
+    },
+    {
+      "id": "V46",
+      "session_id": "C002-S05",
+      "evidence": [
+        10
+      ],
+      "text": "個案表示下週將在課堂上主動發問三次。",
+      "label": "number",
+      "status": "unsupported",
+      "support": 0.58,
+      "reason": "時間詞「下週」不在引用的逐字稿中"
+    },
+    {
+      "id": "V47",
+      "session_id": "C002-S05",
+      "evidence": [
+        5
+      ],
+      "text": "個案表示焦慮會自己降下來。",
+      "label": "speaker",
+      "status": "supported",
+      "support": 0.86,
+      "reason": ""
+    },
+    {
+      "id": "V48",
+      "session_id": "C002-S05",
+      "evidence": [
+        2
+      ],
+      "text": "個案報告時恐慌發作。",
+      "label": "diagnosis",
+      "status": "unsupported",
+      "support": 0.0,
+      "reason": "與引用段落的用字重疊少，請確認"
+    }
+  ]
+}

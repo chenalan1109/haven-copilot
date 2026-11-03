@@ -104,6 +104,14 @@ python3 scripts/benchmark.py --rooms 4
 
 Processes every demo session, then four at once (four therapy rooms), and writes per-agent times, token counts and tokens per second to `docs/benchmarks/`. It uses a throwaway database. Results so far are in [docs/benchmarks](docs/benchmarks).
 
+### Measuring the verifier
+
+```bash
+python3 scripts/verifier_eval.py
+```
+
+Runs the verifier on 48 note sentences about the simulated sessions: 18 correct ones and 30 with a known error (wrong number, time word, pronoun or speaker, reversed risk statement, invented content, overstated frequency, unmade diagnosis, wrong citation). Reports how many wrong sentences block signing and how many correct ones are flagged by mistake, per error type, in [docs/verifier-eval](docs/verifier-eval). On a laptop with qwen2.5:7b: 26/30 wrong sentences blocked, 0/18 false alarms. The cases were written by the team, so treat these numbers as a regression check, not an independent accuracy figure.
+
 ### Transcribing real audio
 
 ```bash
