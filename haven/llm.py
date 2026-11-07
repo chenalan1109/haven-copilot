@@ -40,8 +40,11 @@ def assert_local(url: str) -> None:
 
 
 def _parse_json(content: str) -> dict | None:
-    """Parses a JSON object, tolerating a ```json fence some servers add."""
+    """Parses a JSON object, tolerating a ```json fence some servers add and a
+    <think> block from reasoning models (Qwen3) whose thinking was not turned off."""
     content = content.strip()
+    if "</think>" in content:
+        content = content.split("</think>", 1)[1].strip()
     if content.startswith("```"):
         content = content.strip("`").removeprefix("json").strip()
     try:
@@ -142,6 +145,8 @@ class OpenAICompatLLM(_LocalLLM):
             "model": self.model,
             "temperature": 0.1,
             "response_format": {"type": "json_object"},
+            # Qwen3 thinks out loud by default; vLLM and llama-server pass this to the chat template.
+            "chat_template_kwargs": {"enable_thinking": False},
             "messages": self._messages(system, prompt),
         })
         try:

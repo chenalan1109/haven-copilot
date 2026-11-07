@@ -150,6 +150,10 @@ class OpenAICompatTest(unittest.TestCase):
         self.assertEqual(llm._parse_json('```json\n{"a": 1}\n```'), {"a": 1})
         self.assertIsNone(llm._parse_json("[1, 2]"))
 
+    def test_skips_think_block(self):
+        from haven import llm
+        self.assertEqual(llm._parse_json('<think>\n先想一下\n</think>\n{"a": 1}'), {"a": 1})
+
 
 if __name__ == "__main__":
     unittest.main()
