@@ -96,6 +96,24 @@ HAVEN_LLM=openai HAVEN_LLM_URL=http://127.0.0.1:8000 HAVEN_MODEL=<served model n
 
 The endpoint check still applies: only this machine or the clinic LAN is accepted.
 
+On a B70 with Docker, `scripts/b70-vllm.sh` starts vLLM on one card, listening on 127.0.0.1 only:
+
+```bash
+bash scripts/b70-vllm.sh Qwen/Qwen3-32B-AWQ qwen3-32b-awq
+HAVEN_LLM=openai HAVEN_MODEL=qwen3-32b-awq python3 -m haven
+```
+
+**Measured on one Arc Pro B70 32GB** (vLLM 0.26.0, the same three simulated sessions, 2–4 minutes of speech each):
+
+| Model on one card | Memory for weights | Draft note per session | 4 rooms at once | Output tok/s | Verifier test set: wrong blocked / right blocked |
+| --- | --- | --- | --- | --- | --- |
+| Qwen3-8B, bf16 | 15.3 GiB | 12–17 s | 17 s | 34 | – |
+| Qwen3-14B, FP8 | 15.2 GiB | 18–24 s | 24 s | 34 | 26/30 / 0/18 |
+| Qwen3-32B, 4-bit AWQ | 18.1 GiB | 20–29 s | 30 s | 26 | 26/30 / 0/18 |
+| *MacBook Air M2 8GB, qwen2.5:7b* | | *37–109 s* | *2 rooms: 222 s* | *5–8* | *26/30 / 0/18* |
+
+A 32B model at 4-bit fits on one card with room for four rooms' context; on an 8GB laptop it does not fit at all. Details in [docs/benchmarks](docs/benchmarks) and [docs/verifier-eval](docs/verifier-eval).
+
 ### Measuring performance
 
 ```bash
@@ -149,7 +167,7 @@ python3 -m unittest discover -s tests -v
 
 | Item | Plan |
 | --- | --- |
-| LLM | 14B–32B model at 4-bit (Qwen3, Gemma 3 or MediaTek Breeze 2) served by OpenVINO GenAI or llama.cpp with the OpenVINO backend |
+| LLM | Running: Qwen3-32B at 4-bit on one card with vLLM (see the table above). Next: compare Traditional Chinese note quality against Qwen3-14B and MediaTek Breeze 2 with psychologist ratings |
 | ASR | Whisper large-v3 or Breeze-ASR on the GPU; pyannote speaker diarization |
 | Storage | SQLCipher encryption at rest, full-disk encryption |
 | Validation | 10–20 simulated sessions labelled by a licensed psychologist |

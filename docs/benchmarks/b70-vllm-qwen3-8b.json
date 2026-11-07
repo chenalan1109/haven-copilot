@@ -1,0 +1,39 @@
+{
+  "label": "b70-vllm-qwen3-8b",
+  "date": "2026-11-07T14:50:38+00:00",
+  "engine": "openai-compat:qwen3-8b",
+  "llm_endpoint": "http://127.0.0.1:8000",
+  "machine": {
+    "system": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+    "processor": "",
+    "gpu": "1x Intel Arc Pro B70 32GB (ZE_AFFINITY_MASK=0)",
+    "server": "vLLM 0.26.0 vllm/vllm-openai-xpu:v0.26.0, Qwen/Qwen3-8B bf16"
+  },
+  "sequential": [
+    {"session_id": "C001-S03", "speech_seconds": 230.0, "total_seconds": 16.6,
+     "agents_ms": {"asr": 0.1, "writer": 13122.9, "verifier": 3443.0, "risk": 0.3, "outcome": 0.1},
+     "llm_calls": 2, "prompt_tokens": 1699, "completion_tokens": 563, "output_tokens_per_second": 34.0,
+     "sentences_supported": 12, "sentences_total": 12, "risk_level": "none"},
+    {"session_id": "C001-S04", "speech_seconds": 232.0, "total_seconds": 14.2,
+     "agents_ms": {"asr": 0.1, "writer": 12079.8, "verifier": 2098.0, "risk": 0.6, "outcome": 0.1},
+     "llm_calls": 2, "prompt_tokens": 1462, "completion_tokens": 493, "output_tokens_per_second": 34.8,
+     "sentences_supported": 9, "sentences_total": 11, "risk_level": "high"},
+    {"session_id": "C002-S05", "speech_seconds": 110.0, "total_seconds": 11.8,
+     "agents_ms": {"asr": 0.1, "writer": 10316.2, "verifier": 1489.3, "risk": 0.1, "outcome": 0.0},
+     "llm_calls": 2, "prompt_tokens": 1023, "completion_tokens": 411, "output_tokens_per_second": 34.8,
+     "sentences_supported": 6, "sentences_total": 9, "risk_level": "none"}
+  ],
+  "median_session_seconds": 14.2,
+  "concurrent": {
+    "rooms": 4,
+    "wall_seconds": 17.0,
+    "slowest_session_seconds": 17.0,
+    "aggregate_output_tokens_per_second": 122.1,
+    "runs": [
+      {"session_id": "C001-S03", "total_seconds": 17.0, "prompt_tokens": 1699, "completion_tokens": 586, "output_tokens_per_second": 34.4, "sentences_supported": 10, "sentences_total": 12, "risk_level": "none"},
+      {"session_id": "C001-S04", "total_seconds": 14.4, "prompt_tokens": 1532, "completion_tokens": 492, "output_tokens_per_second": 34.2, "sentences_supported": 9, "sentences_total": 11, "risk_level": "high"},
+      {"session_id": "C002-S05", "total_seconds": 12.7, "prompt_tokens": 1077, "completion_tokens": 437, "output_tokens_per_second": 34.3, "sentences_supported": 5, "sentences_total": 9, "risk_level": "none"},
+      {"session_id": "C001-S03", "total_seconds": 16.5, "prompt_tokens": 1691, "completion_tokens": 565, "output_tokens_per_second": 34.3, "sentences_supported": 11, "sentences_total": 12, "risk_level": "none"}
+    ]
+  }
+}

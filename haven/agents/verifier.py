@@ -31,7 +31,9 @@ _SAME_TIME = {"本週": "這週", "這一週": "這週", "這個禮拜": "這週
 _CLIENT_SAID = re.compile(r"^個案(?:表示|自述|提到|說)")
 # Risk statements where a dropped or added negation reverses the meaning
 # ("沒有具體計畫" vs. "有具體計畫"). These are the sentences that matter most.
-_RISK_TERM = re.compile(r"自殺|結束生命|結束自己的生命|想死|自傷|傷害自己|計畫|工具|輕生")
+# 計畫 and 工具 count only in their risk sense, so "讀書計畫" is not a risk sentence.
+_RISK_TERM = re.compile(r"自殺|結束生命|結束自己的生命|想死|自傷|傷害自己|輕生"
+                        r"|具體(?:的)?計畫|安全計畫|(?:計畫|工具|方法)(?:去|要)?(?:傷害|結束|自殺)")
 _NEGATION = re.compile(r"沒有|沒|不|未|否認|無")
 
 SYSTEM_PROMPT = "你是嚴謹的事實查核員。判斷「紀錄句子」是否能由「逐字稿」直接支持。只輸出 JSON。"
