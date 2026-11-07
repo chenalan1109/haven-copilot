@@ -211,7 +211,10 @@ class Handler(BaseHTTPRequestHandler):
                 t = transcribe_audio(Path(tmp.name), session_id, client_id, len(client.get("sessions", [])) + 1, date.today().isoformat(), simulated)
             except ImportError:
                 return self._error(HTTPStatus.NOT_IMPLEMENTED, "faster-whisper is not installed")
+            except OSError:
+                return self._error(HTTPStatus.SERVICE_UNAVAILABLE, f"speech-to-text server not reachable at {config.ASR_URL}")
         # The raw audio is never kept: the temp file is deleted on leaving the block.
+        labelled = ORCH.speakers.run(t)
         save_transcript(t)
         with CLIENTS_LOCK:  # two uploads at once must not drop each other's session
             clients = load_clients()
@@ -221,7 +224,7 @@ class Handler(BaseHTTPRequestHandler):
             tmp_file = config.CLIENTS_FILE.with_suffix(".tmp")
             tmp_file.write_text(json.dumps(clients, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             tmp_file.replace(config.CLIENTS_FILE)
-        store.audit("transcribe_upload", f"{session_id} consent=1 simulated={int(simulated)}; audio deleted after ASR")
+        store.audit("transcribe_upload", f"{session_id} consent=1 simulated={int(simulated)} asr={config.ASR_BACKEND} speakers_guessed={labelled}/{len(t.segments)}; audio deleted after ASR")
         return self._json(ORCH.process_session(session_id))
 
 

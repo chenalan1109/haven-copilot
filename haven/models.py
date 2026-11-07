@@ -12,6 +12,9 @@ class Segment:
     end: float
     speaker: str  # "therapist" | "client" | "unknown"
     text: str
+    # "script": from a prepared transcript. "model": guessed by the local LLM from
+    # the words, for uploaded audio. Agents treat a guessed label with care.
+    speaker_source: str = "script"
 
 
 @dataclass

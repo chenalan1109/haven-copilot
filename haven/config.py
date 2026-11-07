@@ -17,7 +17,11 @@ LLM_URL = os.environ.get("HAVEN_LLM_URL", "http://127.0.0.1:11434")
 LLM_MODEL = os.environ.get("HAVEN_MODEL", "qwen2.5:7b")
 LLM_TIMEOUT = float(os.environ.get("HAVEN_LLM_TIMEOUT", "180"))
 
-ASR_MODEL = os.environ.get("HAVEN_ASR_MODEL", "small")
+# "faster-whisper" runs Whisper in this process (CPU); "openai" sends the audio to a local
+# server with the OpenAI transcription API, such as vLLM serving Whisper on the B70.
+ASR_BACKEND = os.environ.get("HAVEN_ASR", "faster-whisper")
+ASR_URL = os.environ.get("HAVEN_ASR_URL", "http://127.0.0.1:8001")
+ASR_MODEL = os.environ.get("HAVEN_ASR_MODEL", "small" if ASR_BACKEND == "faster-whisper" else "whisper")
 
 HOST = os.environ.get("HAVEN_HOST", "127.0.0.1")
 PORT = int(os.environ.get("HAVEN_PORT", "8765"))

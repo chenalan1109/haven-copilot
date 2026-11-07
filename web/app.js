@@ -270,7 +270,8 @@ function renderSession(r, focusSeg) {
     el("h3", {}, "逐字稿 ", el("small", {}, "Transcript")),
     r.transcript.map((s) => el("div", { class: `seg${riskSegs.has(s.id) ? " risk" : ""}`, id: `seg-${s.id}` },
       el("span", { class: "t" }, `#${s.id} ${fmtTime(s.start)}`),
-      el("span", { class: `who ${s.speaker}` }, s.speaker === "client" ? "個案" : s.speaker === "therapist" ? "心理師" : "說話者"),
+      el("span", { class: `who ${s.speaker}`, title: s.speaker_source === "model" ? "由本機模型依內容推測，請確認" : "" },
+        (s.speaker === "client" ? "個案" : s.speaker === "therapist" ? "心理師" : "說話者") + (s.speaker_source === "model" ? "?" : "")),
       el("span", {}, s.text),
     )),
   );

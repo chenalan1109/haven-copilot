@@ -71,9 +71,11 @@ class RiskAgent:
     def run(self, t: Transcript) -> RiskReport:
         report = RiskReport(level="none")
         for seg in t.segments:
-            # Without diarization (uploaded audio) a question is most likely the
-            # therapist screening, not the client disclosing.
-            if seg.speaker == "therapist" or (seg.speaker == "unknown" and _is_question(seg.text)):
+            # A question is most likely the therapist screening, not the client
+            # disclosing. A "therapist" label guessed by the model is not trusted
+            # on its own: a wrong guess must not hide what the client said.
+            known_therapist = seg.speaker == "therapist" and seg.speaker_source != "model"
+            if known_therapist or (seg.speaker != "client" and _is_question(seg.text)):
                 if any(c in seg.text for c in SCREENING):
                     report.screening_asked.append(seg.id)
                 if any(c in seg.text for c in SAFETY):

@@ -9,6 +9,7 @@ from . import config, store
 from .agents.memory import CaseMemory
 from .agents.outcome import OutcomeAgent
 from .agents.risk import RiskAgent
+from .agents.speakers import SpeakerAgent
 from .agents.verifier import Verifier
 from .agents.writer import NoteWriter
 from .llm import get_llm
@@ -35,6 +36,7 @@ class Orchestrator:
         self.risk = RiskAgent()
         self.outcome = OutcomeAgent()
         self.memory = CaseMemory(self.llm)
+        self.speakers = SpeakerAgent(self.llm)
 
     @property
     def engine(self) -> str:
