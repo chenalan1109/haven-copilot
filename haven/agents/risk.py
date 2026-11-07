@@ -25,7 +25,7 @@ LEXICON: dict[str, tuple[str, list[str]]] = {
 }
 PROTECTIVE = ["不想讓", "妹妹", "弟弟", "家人", "朋友", "貓", "狗", "信仰", "孩子"]
 SCREENING = ["結束自己的生命", "傷害自己", "想死", "自殺的念頭"]
-SAFETY = ["安全計畫", "一九二五", "1925", "安心專線", "急診", "身心科", "提前"]
+SAFETY = ["安全計畫", "一九二五", "1925", "安心專線", "急診", "身心科"]
 
 # Elements of a suicide risk inquiry, after the structure of the Columbia
 # Suicide Severity Rating Scale and common safety-planning practice.
@@ -55,9 +55,11 @@ def checklist(t: Transcript) -> list[dict]:
     """Which parts of a suicide risk inquiry appear in the session, with segment ids."""
     out = []
     for item, therapist_cues, client_cues in CHECKLIST:
+        # Therapist cues are broad ("藥"), so they count only on lines known to be
+        # the therapist's; a guessed label must not tick an item.
         covered = [
             seg.id for seg in t.segments
-            if any(c in seg.text for c in (therapist_cues if seg.speaker != "client" else client_cues))
+            if any(c in seg.text for c in (therapist_cues if _known_therapist(seg) else client_cues))
         ]
         out.append({"item": item, "covered": covered})
     return out
@@ -67,27 +69,37 @@ def _is_question(text: str) -> bool:
     return text.rstrip().endswith(("？", "?"))
 
 
+def _known_therapist(seg) -> bool:
+    return seg.speaker == "therapist" and seg.speaker_source == "script"
+
+
 class RiskAgent:
     def run(self, t: Transcript) -> RiskReport:
         report = RiskReport(level="none")
         for seg in t.segments:
-            # A question is most likely the therapist screening, not the client
-            # disclosing. A "therapist" label guessed by the model is not trusted
-            # on its own: a wrong guess must not hide what the client said.
-            known_therapist = seg.speaker == "therapist" and seg.speaker_source != "model"
-            if known_therapist or (seg.speaker != "client" and _is_question(seg.text)):
+            # Screening and safety steps count only on lines known to be the
+            # therapist's. With uploaded audio the speaker is a guess, so every
+            # line is scanned: a wrong guess must not hide what the client said.
+            if _known_therapist(seg):
                 if any(c in seg.text for c in SCREENING):
                     report.screening_asked.append(seg.id)
                 if any(c in seg.text for c in SAFETY):
                     report.safety_actions.append(seg.id)
                 continue
+            unconfirmed = seg.speaker_source != "script" or seg.speaker not in ("therapist", "client")
+            # A guessed-therapist line or a question may well be the therapist
+            # screening: kept for review rather than at full level, never dropped.
+            maybe_therapist = unconfirmed and (seg.speaker == "therapist" or _is_question(seg.text))
             for category, (level, cues) in LEXICON.items():
                 for cue in cues:
                     if cue not in seg.text:
                         continue
                     negated = _negated(seg.text, cue)
-                    report.flags.append(RiskFlag(category, "review" if negated else level, seg.id, seg.text, cue, negated))
+                    lvl = "review" if negated or (maybe_therapist and LEVEL_ORDER[level] > LEVEL_ORDER["review"]) else level
+                    report.flags.append(RiskFlag(category, lvl, seg.id, seg.text, cue, negated, unconfirmed))
                     break
+            if unconfirmed and seg.speaker == "therapist":
+                continue  # a therapist's "家人" is not the client's protective factor
             for cue in PROTECTIVE:
                 if cue in seg.text:
                     report.protective.append(RiskFlag("保護因子", "info", seg.id, seg.text, cue))

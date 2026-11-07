@@ -91,7 +91,7 @@ class Verifier:
                 continue
             source = "\n".join(cited)
             if _CLIENT_SAID.search(s.text) and all(segs[e].speaker == "therapist" for e in s.evidence):
-                s.status, s.support, s.reason = "unsupported", 0.0, "句子寫個案表示，但引用的都是心理師的話"
+                s.status, s.support, s.reason = "unsupported", 0.0, "句子寫個案表示，但引用的都是心理師的話" + ("（說話者為模型推測）" if any(segs[e].speaker_source != "script" for e in s.evidence) else "")
                 continue
             s.support = round(max(overlap(s.text, c) for c in cited), 2)
             violation = rule_violation(s.text, source)
@@ -115,6 +115,15 @@ class Verifier:
                     sentences[i].status, sentences[i].reason = "supported", ""
                 else:
                     sentences[i].reason = "本機模型判斷引用段落不足以支持此句"
+        for s in sentences:
+            if s.source == "measure":
+                continue
+            # Uploaded audio: who said a line is the model's guess, so a sentence
+            # about what the client said, or about risk, waits for the therapist.
+            guessed = any(segs[e].speaker_source != "script" for e in s.evidence if e in segs)
+            if guessed and s.status == "supported" and (_CLIENT_SAID.search(s.text) or _RISK_TERM.search(s.text)):
+                s.status, s.reason = "weak", "引用段落的說話者由本機模型推測，請確認是誰說的"
+            s.must_confirm = s.status == "weak" and bool(_RISK_TERM.search(s.text))
         # Score lines are not claims about the session; leave them out of the ratio.
         claims = [s for s in sentences if s.source != "measure"]
         n = len(claims)
@@ -123,5 +132,6 @@ class Verifier:
             "total": n,
             **counts,
             "supported_ratio": round(counts["supported"] / n, 3) if n else 0.0,
-            "ready_to_sign": counts["unsupported"] == 0,
+            "must_confirm": sum(1 for s in claims if s.must_confirm),
+            "ready_to_sign": counts["unsupported"] == 0 and not any(s.must_confirm for s in claims),
         }

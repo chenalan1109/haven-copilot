@@ -22,19 +22,23 @@ def _transcript(*texts):
     return Transcript("T-S01", "C001", 1, "2026-11-08", segs)
 
 
+GOOD = {"text": "…", "segments": [
+    {"start": 0.0, "end": 4.2, "text": "有時候會覺得活著好累。"},
+    {"start": 4.2, "end": 7.0, "text": "  "},
+    {"start": 7.0, "end": 9.5, "text": "這些想法多常出現？"},
+]}
+
+
 class FakeWhisper(BaseHTTPRequestHandler):
     seen = {}
+    reply = (200, GOOD)
 
     def do_POST(self):
         body = self.rfile.read(int(self.headers["Content-Length"]))
         FakeWhisper.seen = {"path": self.path, "ctype": self.headers["Content-Type"], "body": body}
-        out = {"text": "…", "segments": [
-            {"start": 0.0, "end": 4.2, "text": "有時候會覺得活著好累。"},
-            {"start": 4.2, "end": 7.0, "text": "  "},
-            {"start": 7.0, "end": 9.5, "text": "這些想法多常出現？"},
-        ]}
-        data = json.dumps(out, ensure_ascii=False).encode()
-        self.send_response(200)
+        status, out = FakeWhisper.reply
+        data = out if isinstance(out, bytes) else json.dumps(out, ensure_ascii=False).encode()
+        self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
@@ -55,7 +59,22 @@ class OpenAITranscriptionTest(unittest.TestCase):
 
     def tearDown(self):
         self.srv.shutdown()
+        self.srv.server_close()
+        FakeWhisper.reply = (200, GOOD)
         config.ASR_BACKEND, config.ASR_URL = self.saved
+
+    def test_bad_replies_are_asr_errors(self):
+        for reply in ((400, {"error": "file too large"}), (200, b"<html>"), (200, {"segments": [{"end": 1, "text": "x"}]}),
+                      (200, {"text": None}), (200, [])):
+            FakeWhisper.reply = reply
+            with self.assertRaises(transcript.ASRError, msg=str(reply)):
+                transcript.transcribe_audio(self.audio, "T-S01", "C001", 1, "2026-11-08")
+
+    def test_text_without_timestamps_is_split_into_sentences(self):
+        FakeWhisper.reply = (200, {"text": "最近睡不好。這些想法多常出現？大概每天晚上。", "duration": 12.0})
+        t = transcript.transcribe_audio(self.audio, "T-S01", "C001", 1, "2026-11-08")
+        self.assertEqual([s.text for s in t.segments], ["最近睡不好。", "這些想法多常出現？", "大概每天晚上。"])
+        self.assertAlmostEqual(t.segments[-1].end, 12.0, places=0)
 
     def test_segments_from_local_server(self):
         t = transcript.transcribe_audio(self.audio, "T-S01", "C001", 1, "2026-11-08")
@@ -101,6 +120,30 @@ class GuessedSpeakerRiskTest(unittest.TestCase):
         t.segments[0].speaker, t.segments[0].speaker_source = "therapist", "model"
         report = RiskAgent().run(t)
         self.assertEqual([f.segment_id for f in report.flags], [1])
+
+    def test_unlabelled_question_is_still_scanned(self):
+        # A client's question ("…你會覺得我很糟嗎？") must not be taken for screening.
+        t = _transcript("我最近很想死，你會覺得我很糟嗎？")
+        report = RiskAgent().run(t)
+        self.assertEqual([(f.segment_id, f.level, f.speaker_unconfirmed) for f in report.flags], [(1, "review", True)])
+        self.assertEqual(report.screening_asked, [])
+
+    def test_guessed_labels_do_not_tick_the_checklist(self):
+        t = _transcript("有時候會想死。", "我有在吃藥。")
+        t.segments[0].speaker, t.segments[0].speaker_source = "client", "model"
+        t.segments[1].speaker, t.segments[1].speaker_source = "therapist", "model"
+        items = {c["item"]: c["covered"] for c in RiskAgent().run(t).checklist}
+        self.assertEqual(items["工具或手段可及性"], [])
+
+    def test_note_on_guessed_speakers_waits_for_the_therapist(self):
+        from haven.agents.verifier import Verifier
+        from haven.models import Note, NoteSentence
+        t = _transcript("最近睡不好，半夜三點就醒來。")
+        t.segments[0].speaker, t.segments[0].speaker_source = "client", "model"
+        note = Note("SOAP", {"S": [NoteSentence("個案表示最近睡不好，半夜三點就醒來。", [1])]}, "test")
+        Verifier().run(note, t)
+        self.assertEqual(note.sections["S"][0].status, "weak")
+        self.assertIn("推測", note.sections["S"][0].reason)
 
     def test_scripted_therapist_line_is_not_a_disclosure(self):
         t = _transcript("有時候會覺得活著好累，會想說如果消失算了。")

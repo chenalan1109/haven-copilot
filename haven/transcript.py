@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import re
+import urllib.error
 import uuid
 import urllib.request
 from pathlib import Path
@@ -40,6 +42,23 @@ def _whisper_model():
 PROMPT = "以下是心理諮商會談的逐字稿，使用繁體中文。"
 
 
+class ASRError(Exception):
+    """The speech-to-text server answered, but not with a usable transcript."""
+
+
+def _sentences(text: str, duration: float) -> list[tuple[float, float, str]]:
+    """Splits a transcript without timestamps at sentence ends, spreading the time
+    by length, so a whole session is never one line that every citation points to."""
+    parts = [p for p in re.findall(r"[^。！？!?]+[。！？!?]?", text) if p.strip()]
+    total = sum(len(p) for p in parts) or 1
+    out, t = [], 0.0
+    for p in parts:
+        d = duration * len(p) / total
+        out.append((t, t + d, p))
+        t += d
+    return out
+
+
 def _faster_whisper(audio_path: Path) -> list[tuple[float, float, str]]:
     raw_segments, _info = _whisper_model().transcribe(str(audio_path), language="zh", vad_filter=True, initial_prompt=PROMPT)
     return [(s.start, s.end, s.text) for s in raw_segments]
@@ -64,12 +83,28 @@ def _openai_server(audio_path: Path) -> list[tuple[float, float, str]]:
         data=body,
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
     )
-    with _OPENER.open(req, timeout=config.LLM_TIMEOUT) as r:
-        out = json.load(r)
-    segments = out.get("segments") or []
-    if not segments and out.get("text"):
-        segments = [{"start": 0.0, "end": out.get("duration", 0.0), "text": out["text"]}]
-    return [(float(s["start"]), float(s["end"]), s["text"]) for s in segments]
+    try:
+        with _OPENER.open(req, timeout=config.ASR_TIMEOUT) as r:
+            out = json.load(r)
+    except urllib.error.HTTPError as e:  # an answer, not a connection failure
+        raise ASRError(f"HTTP {e.code}") from e
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        raise ASRError("reply is not JSON") from e
+    if not isinstance(out, dict):
+        raise ASRError("reply is not a JSON object")
+    segments = out.get("segments")
+    if isinstance(segments, list) and segments:
+        try:
+            return [(float(s["start"]), float(s["end"]), str(s.get("text") or "")) for s in segments]
+        except (KeyError, TypeError, ValueError) as e:
+            raise ASRError("segments without start, end or text") from e
+    if isinstance(out.get("text"), str) and out["text"].strip():
+        try:
+            duration = float(out.get("duration") or 0.0)
+        except (TypeError, ValueError):
+            duration = 0.0
+        return _sentences(out["text"], duration)
+    raise ASRError("no transcript in the reply")
 
 
 def transcribe_audio(audio_path: Path, session_id: str, client_id: str, session_no: int, date: str, simulated: bool = True) -> Transcript:

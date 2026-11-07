@@ -41,6 +41,8 @@ class NoteSentence:
     # "transcript": evidence is segment ids. "measure": the sentence is filled
     # in from questionnaire scores, so there is no transcript line to cite.
     source: str = "transcript"
+    # A weak risk sentence: signing waits until the therapist confirms it.
+    must_confirm: bool = False
 
 
 @dataclass
@@ -61,6 +63,8 @@ class RiskFlag:
     quote: str
     cue: str
     negated: bool = False
+    # True when the line's speaker was guessed by the model, not confirmed.
+    speaker_unconfirmed: bool = False
 
 
 @dataclass

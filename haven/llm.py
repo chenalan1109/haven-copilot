@@ -10,6 +10,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import os
+import socket
 import time
 import urllib.error
 import urllib.request
@@ -24,18 +25,44 @@ class NonLocalEndpointError(ValueError):
 
 # urllib honours HTTP(S)_PROXY and the macOS system proxy, which would send
 # session text through a proxy server. Haven's requests never use one.
-_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    # A redirect could point a request at a host assert_local never checked.
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
+
+
+# This machine or a clinic LAN. Not link-local (169.254.169.254 is a cloud
+# metadata address), not 0.0.0.0, not the other special "private" ranges.
+_LOCAL_NETS = [ipaddress.ip_network(n) for n in (
+    "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "::1/128", "fc00::/7")]
+
+
+def _is_local_ip(ip) -> bool:
+    if getattr(ip, "ipv4_mapped", None):
+        ip = ip.ipv4_mapped
+    return any(ip in n for n in _LOCAL_NETS if n.version == ip.version)
 
 
 def assert_local(url: str) -> None:
     host = urlparse(url).hostname or ""
-    if host in ("localhost",) or host.endswith(".local"):
+    if host == "localhost":
+        return
+    if host.endswith(".local"):  # mDNS name on the LAN: check where it points
+        try:
+            addrs = {a[4][0] for a in socket.getaddrinfo(host, None)}
+        except OSError:
+            raise NonLocalEndpointError(f"endpoint {host!r} does not resolve")
+        if not addrs or not all(_is_local_ip(ipaddress.ip_address(a.split("%")[0])) for a in addrs):
+            raise NonLocalEndpointError(f"endpoint must be local, {host!r} points elsewhere")
         return
     try:
         ip = ipaddress.ip_address(host)
     except ValueError:
         raise NonLocalEndpointError(f"LLM endpoint must be local, got {host!r}")
-    if not (ip.is_loopback or ip.is_private):
+    if not _is_local_ip(ip):
         raise NonLocalEndpointError(f"LLM endpoint must be local, got {host!r}")
 
 

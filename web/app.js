@@ -7,7 +7,7 @@ const SECTION_NAMES = {
 };
 // Describes the cues found in the transcript, not the client's risk level.
 const RISK_NAMES = { none: "未偵測到風險線索", review: "有需留意的線索", high: "有自殺或自傷等高關注線索", critical: "提及計畫或工具" };
-const STATUS_NAMES = { supported: "有逐字稿支持", weak: "支持不足", unsupported: "無支持證據" };
+const STATUS_NAMES = { supported: "用字與引用段落相符", weak: "支持不足", unsupported: "無支持證據" };
 const AGENT_NAMES = { asr: "轉寫", writer: "紀錄", verifier: "驗證", risk: "風險", outcome: "成效" };
 
 let currentClient = null;
@@ -241,7 +241,7 @@ function rerenderNote() {
 }
 
 function blockingCount(note) {
-  return Object.values(note.sections).flat().filter((s) => s.status === "unsupported" && !confirmed.has(s.text)).length;
+  return Object.values(note.sections).flat().filter((s) => (s.status === "unsupported" || s.must_confirm) && !confirmed.has(s.text)).length;
 }
 
 function renderNote(container, note, verification) {
@@ -253,7 +253,7 @@ function renderNote(container, note, verification) {
   );
   const blocking = blockingCount(note);
   const bar = document.getElementById("verify-summary");
-  bar.textContent = `驗證 agent：${verification.supported}/${verification.total} 句有逐字稿支持` +
+  bar.textContent = `驗證 agent：${verification.supported}/${verification.total} 句用字與引用段落相符` +
     (verification.weak ? `，${verification.weak} 句支持不足` : "") +
     (verification.unsupported ? `，${verification.unsupported} 句無支持證據` : "") +
     (blocking ? `（尚有 ${blocking} 句需修改、刪除或確認才能簽核）` : "");
@@ -280,19 +280,20 @@ function renderSession(r, focusSeg) {
   const riskPanel = el("div", { class: `risk-panel lvl-${risk.level}` },
     el("h4", {}, `風險線索：${RISK_NAMES[risk.level]}`),
     risk.flags.map((f) => el("div", { class: "flag", onclick: () => highlight([f.segment_id]) },
-      el("b", {}, `[${f.category}]`), `#${f.segment_id}「${f.quote}」`, f.negated ? "（含否定語，請確認）" : "")),
+      el("b", {}, `[${f.category}]`), `#${f.segment_id}「${f.quote}」`, f.negated ? "（含否定語，請確認）" : "",
+      f.speaker_unconfirmed ? "（說話者未確認，可能是心理師的提問）" : "")),
     risk.protective.length ? el("div", { class: "flag" }, el("b", {}, "[保護因子]"),
       risk.protective.map((p) => `#${p.segment_id}「${p.quote}」`).join(" ")) : null,
     risk.flags.length ? el("div", { class: "checks" },
-      el("span", {}, risk.screening_asked.length ? `✓ 已詢問自殺意念（#${risk.screening_asked.join(", #")}）` : "✗ 逐字稿中未見自殺意念詢問"),
-      el("span", {}, risk.safety_actions.length ? `✓ 已有安全措施（#${risk.safety_actions.join(", #")}）` : "✗ 未見安全計畫或轉介"),
+      el("span", {}, risk.screening_asked.length ? `✓ 逐字稿出現自殺意念詢問用語（#${risk.screening_asked.join(", #")}）` : "✗ 逐字稿中未見自殺意念詢問"),
+      el("span", {}, risk.safety_actions.length ? `✓ 逐字稿出現安全計畫或轉介用語（#${risk.safety_actions.join(", #")}）` : "✗ 未見安全計畫或轉介"),
     ) : null,
     risk.checklist.length ? el("div", { class: "checklist" },
-      el("div", { class: "checklist-title" }, "自殺風險評估要素（逐字稿中是否談到）"),
+      el("div", { class: "checklist-title" }, "自殺風險評估要素（關鍵詞比對，只看是否談到，無法評估評估品質）"),
       risk.checklist.map((c) => el("span", { class: c.covered.length ? "done" : "missing" },
         c.covered.length ? `✓ ${c.item}（#${c.covered.join(", #")}）` : `○ ${c.item}：可考慮補問或補記`)),
     ) : null,
-    el("div", { class: "disclaimer" }, "提示僅供參考，不取代心理師的臨床判斷；未標示不代表沒有風險。"),
+    el("div", { class: "disclaimer" }, "提示僅供參考，不取代心理師的臨床判斷；未標示不代表沒有風險。上傳錄音的說話者由模型推測，只有逐字稿標示的心理師用語才計入詢問與安全措施。"),
   );
 
   const noteBox = el("div", {});

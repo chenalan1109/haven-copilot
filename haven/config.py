@@ -16,6 +16,8 @@ LLM_BACKEND = os.environ.get("HAVEN_LLM", "auto")
 LLM_URL = os.environ.get("HAVEN_LLM_URL", "http://127.0.0.1:11434")
 LLM_MODEL = os.environ.get("HAVEN_MODEL", "qwen2.5:7b")
 LLM_TIMEOUT = float(os.environ.get("HAVEN_LLM_TIMEOUT", "180"))
+# A 50-minute recording takes far longer than one note.
+ASR_TIMEOUT = float(os.environ.get("HAVEN_ASR_TIMEOUT", "900"))
 
 # "faster-whisper" runs Whisper in this process (CPU); "openai" sends the audio to a local
 # server with the OpenAI transcription API, such as vLLM serving Whisper on the B70.

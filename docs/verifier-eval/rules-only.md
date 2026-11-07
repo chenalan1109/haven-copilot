@@ -1,13 +1,13 @@
 # Verifier test set: rules-only
 
 - Engine: `rules + overlap (no LLM)`
-- Date: 2026-11-03T09:08:12+08:00
+- Date: 2026-11-08T01:51:40+08:00
 - Cases: 48 sentences about the simulated sessions (18 correct, 30 with a known error)
-- Blocked = marked unsupported, so the note cannot be signed until the therapist acts. Flagged = blocked or marked weak.
+- Blocked = marked unsupported, or weak on a risk sentence, so the note cannot be signed until the therapist acts. Flagged = blocked or marked weak.
 
 | | Blocked | Flagged |
 | --- | --- | --- |
-| Wrong sentences | 26/30 (87%) | 29/30 (97%) |
+| Wrong sentences | 27/30 (90%) | 29/30 (97%) |
 | Correct sentences (false alarms) | 2/18 (11%) | 12/18 (67%) |
 
 | Error type | Blocked | Flagged |
@@ -18,7 +18,7 @@
 | fabrication: content not in the session | 3/3 (100%) | 3/3 (100%) |
 | hedge: hedged statement written as fact | 0/1 (0%) | 0/1 (0%) |
 | intensity: frequency or severity overstated | 2/2 (100%) | 2/2 (100%) |
-| negation: risk statement with reversed meaning | 2/3 (67%) | 3/3 (100%) |
+| negation: risk statement with reversed meaning | 3/3 (100%) | 3/3 (100%) |
 | number: wrong number | 6/6 (100%) | 6/6 (100%) |
 | pronoun: wrong gendered pronoun | 2/2 (100%) | 2/2 (100%) |
 | speaker: therapist's words attributed to the client | 2/2 (100%) | 2/2 (100%) |

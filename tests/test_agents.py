@@ -79,6 +79,17 @@ class VerifierTest(unittest.TestCase):
         Verifier(YesLLM()).run(note, t)
         self.assertEqual(note.sections["S"][0].status, "supported")
 
+    def test_weak_risk_sentence_blocks_signing(self):
+        class YesLLM:
+            def generate_json(self, system, prompt):
+                return {"results": [{"id": i, "supported": True} for i in range(10)]}
+        t = load_transcript("C001-S04")
+        note = Note("SOAP", {"S": [NoteSentence("個案表示有時會想消失，但否認自殺意念。", [10])]}, "test")
+        summary = Verifier(YesLLM()).run(note, t)
+        self.assertTrue(note.sections["S"][0].must_confirm)
+        self.assertEqual(summary["must_confirm"], 1)
+        self.assertFalse(summary["ready_to_sign"])
+
     def test_therapist_words_written_as_client_said(self):
         status, _ = self.check("個案表示下週想練習向主管提出合理的工作量。", [17])
         self.assertEqual(status, "unsupported")
@@ -132,8 +143,25 @@ class PrivacyTest(unittest.TestCase):
                 OllamaLLM(url=url)
 
     def test_local_endpoints_are_allowed(self):
-        for url in ("http://127.0.0.1:11434", "http://localhost:11434", "http://192.168.1.20:8000", "http://haven-box.local"):
+        for url in ("http://127.0.0.1:11434", "http://localhost:11434", "http://192.168.1.20:8000", "http://10.0.0.5:8000"):
             assert_local(url)
+
+    def test_special_addresses_are_refused(self):
+        # 169.254.169.254 is a cloud metadata address; 0.0.0.0 and 192.0.0.8 are not a clinic LAN.
+        for url in ("http://169.254.169.254", "http://0.0.0.0:8000", "http://192.0.0.8", "http://[::ffff:8.8.8.8]"):
+            with self.assertRaises(NonLocalEndpointError, msg=url):
+                assert_local(url)
+
+    def test_local_names_are_resolved_first(self):
+        import socket
+        from unittest import mock
+        def fake(ip):
+            return lambda host, port: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, 0))]
+        with mock.patch("socket.getaddrinfo", fake("192.168.1.20")):
+            assert_local("http://haven-box.local")
+        with mock.patch("socket.getaddrinfo", fake("8.8.8.8")):
+            with self.assertRaises(NonLocalEndpointError):
+                assert_local("http://haven-box.local")
 
 
 class PipelineTest(unittest.TestCase):

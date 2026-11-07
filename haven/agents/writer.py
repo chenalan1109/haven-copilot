@@ -35,7 +35,10 @@ SYSTEM_PROMPT = (
 
 
 def _prompt(t: Transcript, template: str) -> str:
-    lines = [f"[{s.id}] {'心理師' if s.speaker == 'therapist' else '個案' if s.speaker == 'client' else '說話者'}：{s.text}" for s in t.segments]
+    def who(s):
+        name = {"therapist": "心理師", "client": "個案"}.get(s.speaker, "說話者")
+        return name + ("（推測）" if s.speaker_source == "model" else "")
+    lines = [f"[{s.id}] {who(s)}：{s.text}" for s in t.segments]
     sections = "\n".join(f'- "{k}": {v}' for k, v in TEMPLATES[template].items())
     keys = ", ".join(f'"{k}": [{{"text": "...", "evidence": [段落編號]}}]' for k in TEMPLATES[template])
     return (

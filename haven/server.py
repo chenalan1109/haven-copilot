@@ -14,12 +14,16 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import config, store
+from .agents.verifier import _RISK_TERM
 from .models import Note, NoteSentence, to_dict
 from .orchestrator import Orchestrator, get_client, load_clients
-from .transcript import load_transcript, save_transcript, transcribe_audio
+from .transcript import ASRError, load_transcript, save_transcript, transcribe_audio
 
 ORCH: Orchestrator | None = None
 MAX_UPLOAD = 200 * 1024 * 1024
+# What the consent box covers, written to the audit log with each upload.
+CONSENT_SCOPE = "v1:recording+local-ai-transcription+speaker-guess+transcript-kept"
+AUDIO_SUFFIXES = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".opus", ".webm"}
 SESSION_ID = re.compile(r"^[A-Za-z0-9-]{1,40}$")
 CLIENTS_LOCK = threading.Lock()
 # Sent by the UI on every POST. A cross-site page cannot add a custom header
@@ -178,9 +182,11 @@ class Handler(BaseHTTPRequestHandler):
                 sentences = [s for v in payload["note"].get("sections", {}).values() for s in v]
                 blocking = [s["text"] for s in sentences
                             if s.get("status") not in ("supported", "weak", "unsupported")
-                            or (s.get("status") == "unsupported" and not s.get("confirmed_by_therapist"))]
+                            or (s.get("status") == "unsupported" and not s.get("confirmed_by_therapist"))
+                            # A weak risk sentence needs the therapist too; checked here, not taken from the payload.
+                            or (s.get("status") == "weak" and _RISK_TERM.search(str(s.get("text", ""))) and not s.get("confirmed_by_therapist"))]
                 if blocking:
-                    return self._error(HTTPStatus.CONFLICT, f"{len(blocking)} sentence(s) unverified or unsupported; re-verify, edit or confirm them first")
+                    return self._error(HTTPStatus.CONFLICT, f"{len(blocking)} sentence(s) unverified, unsupported, or a weak risk sentence; re-verify, edit or confirm them first")
                 kept = sum(1 for s in sentences if s.get("status") != "supported" and s.get("confirmed_by_therapist"))
                 try:
                     return self._json(store.sign_note(parts[2], payload["note"], payload["signed_by"], kept))
@@ -203,14 +209,27 @@ class Handler(BaseHTTPRequestHandler):
             return self._error(HTTPStatus.CONFLICT, "a session with this id already exists")
         simulated = query.get("simulated", ["1"])[0] == "1"
         client = get_client(client_id)
-        suffix = Path(self.headers.get("X-Filename", "audio.wav")).suffix or ".wav"
+        suffix = Path(self.headers.get("X-Filename", "audio.wav")).suffix.lower()
+        if suffix not in AUDIO_SUFFIXES:
+            suffix = ".wav"
+        length = int(self.headers.get("Content-Length", 0))
+        if length > MAX_UPLOAD:
+            return self._error(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "upload too large")
         with tempfile.NamedTemporaryFile(suffix=suffix) as tmp:
-            tmp.write(self._body())
+            # Streamed to the temp file, so a long recording is not held in memory.
+            while length > 0:
+                chunk = self.rfile.read(min(length, 1 << 20))
+                if not chunk:
+                    break
+                tmp.write(chunk)
+                length -= len(chunk)
             tmp.flush()
             try:
                 t = transcribe_audio(Path(tmp.name), session_id, client_id, len(client.get("sessions", [])) + 1, date.today().isoformat(), simulated)
             except ImportError:
                 return self._error(HTTPStatus.NOT_IMPLEMENTED, "faster-whisper is not installed")
+            except ASRError as e:
+                return self._error(HTTPStatus.BAD_GATEWAY, f"speech-to-text server at {config.ASR_URL}: {e}")
             except OSError:
                 return self._error(HTTPStatus.SERVICE_UNAVAILABLE, f"speech-to-text server not reachable at {config.ASR_URL}")
         # The raw audio is never kept: the temp file is deleted on leaving the block.
@@ -224,7 +243,7 @@ class Handler(BaseHTTPRequestHandler):
             tmp_file = config.CLIENTS_FILE.with_suffix(".tmp")
             tmp_file.write_text(json.dumps(clients, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             tmp_file.replace(config.CLIENTS_FILE)
-        store.audit("transcribe_upload", f"{session_id} consent=1 simulated={int(simulated)} asr={config.ASR_BACKEND} speakers_guessed={labelled}/{len(t.segments)}; audio deleted after ASR")
+        store.audit("transcribe_upload", f"{session_id} consent={CONSENT_SCOPE} simulated={int(simulated)} asr={config.ASR_BACKEND} speakers_guessed={labelled}/{len(t.segments)}; audio deleted after ASR")
         return self._json(ORCH.process_session(session_id))
 
 

@@ -94,7 +94,7 @@ The B70 runs models through vLLM (XPU), llama.cpp (SYCL) or OpenVINO Model Serve
 HAVEN_LLM=openai HAVEN_LLM_URL=http://127.0.0.1:8000 HAVEN_MODEL=<served model name> python3 -m haven
 ```
 
-The endpoint check still applies: only this machine or the clinic LAN is accepted.
+The endpoint check still applies: only this machine or the clinic LAN is accepted (loopback, 10/8, 172.16/12, 192.168/16, fc00::/7; a `.local` name must resolve to one of them). Redirects are not followed.
 
 On a B70 with Docker, `scripts/b70-vllm.sh` starts vLLM on one card, listening on 127.0.0.1 only:
 
@@ -110,9 +110,9 @@ HAVEN_LLM=openai HAVEN_MODEL=qwen3-32b-awq python3 -m haven
 | Qwen3-8B, bf16 | 15.3 GiB | 12–17 s | 17 s | 34 | – |
 | Qwen3-14B, FP8 | 15.2 GiB | 18–24 s | 24 s | 34 | 26/30 / 0/18 |
 | Qwen3-32B, 4-bit AWQ | 18.1 GiB | 20–29 s | 30 s | 26 | 26/30 / 0/18 |
-| *MacBook Air M2 8GB, qwen2.5:7b* | | *37–109 s* | *2 rooms: 222 s* | *5–8* | *26/30 / 0/18* |
+| *MacBook Air M2 8GB, qwen2.5:7b* | | *37–109 s* | *2 rooms: 222 s* | *5–8* | *27/30 / 1/18* |
 
-A 32B model at 4-bit fits on one card with room for four rooms' context; on an 8GB laptop it does not fit at all. Details in [docs/benchmarks](docs/benchmarks) and [docs/verifier-eval](docs/verifier-eval).
+The B70 verifier figures were measured before the weak-risk-sentence rule; the laptop figures after it. A 32B model at 4-bit fits on one card with room for four rooms' context; on an 8GB laptop it does not fit at all. Details in [docs/benchmarks](docs/benchmarks) and [docs/verifier-eval](docs/verifier-eval).
 
 ### Measuring performance
 
@@ -128,7 +128,7 @@ Processes every demo session, then four at once (four therapy rooms), and writes
 python3 scripts/verifier_eval.py
 ```
 
-Runs the verifier on 48 note sentences about the simulated sessions: 18 correct ones and 30 with a known error (wrong number, time word, pronoun or speaker, reversed risk statement, invented content, overstated frequency, unmade diagnosis, wrong citation). Reports how many wrong sentences block signing and how many correct ones are flagged by mistake, per error type, in [docs/verifier-eval](docs/verifier-eval). On a laptop with qwen2.5:7b: 26/30 wrong sentences blocked, 0/18 false alarms. The cases were written by the team, so treat these numbers as a regression check, not an independent accuracy figure.
+Runs the verifier on 48 note sentences about the simulated sessions: 18 correct ones and 30 with a known error (wrong number, time word, pronoun or speaker, reversed risk statement, invented content, overstated frequency, unmade diagnosis, wrong citation). Reports how many wrong sentences block signing and how many correct ones are flagged by mistake, per error type, in [docs/verifier-eval](docs/verifier-eval). On a laptop with qwen2.5:7b: 27/30 wrong sentences blocked, 1/18 correct ones held for confirmation. Since the Stage II review, a risk sentence that only the model supports also blocks signing until the therapist confirms it: one more wrong sentence is caught, and one correct risk sentence (V22) now needs a click. The cases were written by the team, so treat these numbers as a regression check, not an independent accuracy figure.
 
 ### Transcribing real audio
 
@@ -138,6 +138,21 @@ HAVEN_ASR_MODEL=small python3 -m haven
 ```
 
 Use "上傳會談錄音" in the client page. The first run downloads the Whisper model.
+
+**On the B70**, Whisper runs as a second vLLM server on the same card, next to the note model. The weights (about 18 GB for the 32B model, 1.6 GB for Whisper) and the XPU Docker image are downloaded on the first start, which takes longer than the rest of the setup:
+
+```bash
+UTIL=0.7 bash scripts/b70-vllm.sh Qwen/Qwen3-32B-AWQ qwen3-32b-awq
+PORT=8001 UTIL=0.15 CONTAINER=vllm-asr bash scripts/b70-vllm.sh openai/whisper-large-v3-turbo whisper --max-model-len 448
+curl -s 127.0.0.1:8000/v1/models && curl -s 127.0.0.1:8001/v1/models   # both list their model when ready
+HAVEN_LLM=openai HAVEN_MODEL=qwen3-32b-awq HAVEN_ASR=openai python3 -m haven
+```
+
+Recordings are streamed to a temp file, sent to the local server, and deleted after transcription. Then the local LLM guesses from the words who is speaking (one therapist, one client). There is no acoustic diarization yet, so the guesses are shown with "?" and treated with care:
+
+- The risk agent scans every line whose speaker is guessed or unknown. A guessed-therapist line or a question that contains a cue is kept at "review" with "說話者未確認", never dropped.
+- Screening questions, safety steps and checklist items count only on lines known to be the therapist's (prepared transcripts).
+- A note sentence about what the client said, or about risk, that cites a guessed line is marked "支持不足" with the reason, and a weak risk sentence blocks signing until the therapist confirms it.
 
 ### Tests
 
@@ -160,7 +175,10 @@ python3 -m unittest discover -s tests -v
 | `HAVEN_LLM` | `auto` | `auto` uses Ollama if the model is available, `demo` forces the rule-based engine, `ollama` requires the model, `openai` uses a local OpenAI-compatible server (vLLM, llama.cpp `llama-server`, OpenVINO Model Server) |
 | `HAVEN_LLM_URL` | `http://127.0.0.1:11434` (`:8000` for `openai`) | Local model server; non-local addresses are refused |
 | `HAVEN_MODEL` | `qwen2.5:7b` | Model name on the server |
-| `HAVEN_ASR_MODEL` | `small` | faster-whisper model size |
+| `HAVEN_ASR` | `faster-whisper` | `faster-whisper` transcribes in-process; `openai` sends audio to a local server with the OpenAI transcription API (vLLM serving Whisper) |
+| `HAVEN_ASR_URL` | `http://127.0.0.1:8001` | Local transcription server for `openai`; non-local addresses are refused |
+| `HAVEN_ASR_MODEL` | `small` (`whisper` for `openai`) | faster-whisper model size, or the served model name |
+| `HAVEN_ASR_TIMEOUT` | `900` | Seconds to wait for a transcription |
 | `HAVEN_HOST` / `HAVEN_PORT` | `127.0.0.1` / `8765` | Where the UI is served |
 
 ## Stage II plan (Arc Pro B70)
@@ -168,7 +186,7 @@ python3 -m unittest discover -s tests -v
 | Item | Plan |
 | --- | --- |
 | LLM | Running: Qwen3-32B at 4-bit on one card with vLLM (see the table above). Next: compare Traditional Chinese note quality against Qwen3-14B and MediaTek Breeze 2 with psychologist ratings |
-| ASR | Whisper large-v3 or Breeze-ASR on the GPU; pyannote speaker diarization |
+| ASR | Built: Whisper on the GPU through vLLM, speakers guessed by the local LLM. Next: measure character error rate and speaker accuracy on the B70; acoustic diarization (pyannote) and a speaker-correction step in the UI |
 | Storage | SQLCipher encryption at rest, full-disk encryption |
 | Validation | 10–20 simulated sessions labelled by a licensed psychologist |
 
@@ -188,7 +206,7 @@ Targets to validate on the B70. These are goals, not measured results yet:
 - The rule-based engine and the risk lexicon are for the prototype. Lexicon matching misses indirect expressions; the Stage II LLM pass and psychologist-labelled test data address this.
 - The verifier's bigram overlap is a first filter. Paraphrased sentences are sent to the local LLM for a second check when one is running.
 - The not-on-track rule is a simple heuristic, not a validated expected-recovery curve.
-- Uploaded audio is not yet split by speaker. Until Stage II diarization, questions are treated as the therapist's and are not flagged as disclosures.
+- Uploaded audio has no acoustic speaker diarization yet. Speakers are guessed by the LLM from the words; the therapist cannot yet correct a label in the UI, so lines from guessed speakers are flagged more and counted less (see "Transcribing real audio").
 - There is no login yet: the server only listens on the machine itself. A LAN deployment in Stage II needs therapist accounts, per-therapist access to clients and TLS.
 - The negation rule for risk sentences is deliberately strict and flags some correct sentences; the therapist confirms them.
 - The checklist detects whether a topic came up by keywords. It cannot judge the quality of the inquiry.

@@ -44,13 +44,16 @@ class ClinicalTest(unittest.TestCase):
         self.assertIn("否定", rule_violation("個案表示有具體自殺計畫。", source))
         self.assertEqual(rule_violation("個案曾想過結束生命，但沒有具體計畫。", source), "")
 
-    def test_unknown_speaker_question_is_not_a_disclosure(self):
+    def test_unknown_speaker_question_is_kept_for_review(self):
+        # Without speaker labels a question may be the therapist screening or the
+        # client asking; it is kept at "review", never dropped (Stage II review).
         t = load_transcript("C001-S04")
         for s in t.segments:
-            s.speaker = "unknown"
-        flagged = {f.segment_id for f in RiskAgent().run(t).flags}
-        self.assertNotIn(11, flagged)  # "你有想過要結束自己的生命嗎？" is the screening question
-        self.assertIn(10, flagged)
+            s.speaker, s.speaker_source = "unknown", "none"
+        flags = {f.segment_id: f for f in RiskAgent().run(t).flags}
+        self.assertEqual(flags[11].level, "review")  # "你有想過要結束自己的生命嗎？"
+        self.assertTrue(flags[11].speaker_unconfirmed)
+        self.assertEqual(flags[10].level, "high")
 
     def test_recovery_and_phq9_item9(self):
         self.assertEqual(assess("PHQ9", [{"score": 14}, {"score": 6}])["status"], "recovered")

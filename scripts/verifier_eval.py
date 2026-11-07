@@ -5,7 +5,8 @@
     python3 scripts/verifier_eval.py --label b70-qwen27b
 
 Cases are in data/verifier_eval/cases.json. A case is "blocked" when the verifier marks
-it unsupported (the therapist cannot sign until they edit, delete or keep it) and
+it unsupported, or weak on a risk sentence (the therapist cannot sign until they edit,
+delete or confirm it), and
 "flagged" when it is unsupported or weak. Results go to docs/verifier-eval/<label>.json
 and .md.
 """
@@ -38,7 +39,8 @@ def evaluate(cases: list[dict], llm=None) -> list[dict]:
         note = Note("SOAP", {"S": [NoteSentence(c["text"], c["evidence"]) for c in group]}, "eval")
         Verifier(llm).run(note, t)
         for c, s in zip(group, note.sections["S"]):
-            results.append({**c, "status": s.status, "support": s.support, "reason": s.reason})
+            results.append({**c, "status": s.status, "support": s.support, "reason": s.reason,
+                            "blocks": s.status == "unsupported" or s.must_confirm})
     return results
 
 
@@ -50,15 +52,15 @@ def summarize(results: list[dict]) -> dict:
         rs = [r for r in errors if r["label"] == label]
         per_label[label] = {
             "n": len(rs),
-            "blocked": sum(r["status"] == "unsupported" for r in rs),
+            "blocked": sum(r["blocks"] for r in rs),
             "flagged": sum(r["status"] != "supported" for r in rs),
         }
     return {
         "errors": len(errors),
-        "errors_blocked": sum(r["status"] == "unsupported" for r in errors),
+        "errors_blocked": sum(r["blocks"] for r in errors),
         "errors_flagged": sum(r["status"] != "supported" for r in errors),
         "correct": len(ok),
-        "correct_blocked": sum(r["status"] == "unsupported" for r in ok),
+        "correct_blocked": sum(r["blocks"] for r in ok),
         "correct_flagged": sum(r["status"] != "supported" for r in ok),
         "per_label": per_label,
     }
@@ -94,7 +96,7 @@ def main():
     lines = [f"# Verifier test set: {label}", "", f"- Engine: `{engine}`", f"- Date: {report['date']}",
              f"- Cases: {len(results)} sentences about the simulated sessions ({summary['correct']} correct, "
              f"{summary['errors']} with a known error)",
-             "- Blocked = marked unsupported, so the note cannot be signed until the therapist acts. "
+             "- Blocked = marked unsupported, or weak on a risk sentence, so the note cannot be signed until the therapist acts. "
              "Flagged = blocked or marked weak.", "",
              "| | Blocked | Flagged |", "| --- | --- | --- |",
              f"| Wrong sentences | {pct(summary['errors_blocked'], summary['errors'])} | "

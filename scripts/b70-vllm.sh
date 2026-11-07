@@ -21,6 +21,7 @@ docker run -d --name "$CONTAINER" --net=host --ipc=host --shm-size=16g --privile
   --device /dev/dri:/dev/dri -v /dev/dri/by-path:/dev/dri/by-path \
   -v "$HOME/hf:/root/.cache/huggingface" \
   -e ZE_AFFINITY_MASK="$CARD" -e VLLM_WORKER_MULTIPROC_METHOD=spawn \
+  -e VLLM_MAX_AUDIO_CLIP_FILESIZE_MB=200 \
   --entrypoint bash vllm/vllm-openai-xpu:v0.26.0 \
   -c "source /opt/intel/oneapi/setvars.sh --force >/dev/null 2>&1 || source /root/.bashrc 2>/dev/null; exec $SERVE"
 echo "started; follow with: docker logs -f $CONTAINER"

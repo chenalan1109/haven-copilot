@@ -1,10 +1,10 @@
 {
   "label": "rules-only",
-  "date": "2026-11-03T09:08:12+08:00",
+  "date": "2026-11-08T01:51:40+08:00",
   "engine": "rules + overlap (no LLM)",
   "summary": {
     "errors": 30,
-    "errors_blocked": 26,
+    "errors_blocked": 27,
     "errors_flagged": 29,
     "correct": 18,
     "correct_blocked": 2,
@@ -42,7 +42,7 @@
       },
       "negation": {
         "n": 3,
-        "blocked": 2,
+        "blocked": 3,
         "flagged": 3
       },
       "number": {
@@ -78,7 +78,8 @@
       "label": "ok",
       "status": "supported",
       "support": 0.72,
-      "reason": ""
+      "reason": "",
+      "blocks": false
     },
     {
       "id": "V02",
@@ -90,7 +91,8 @@
       "label": "ok",
       "status": "supported",
       "support": 0.67,
-      "reason": ""
+      "reason": "",
+      "blocks": false
     },
     {
       "id": "V03",
@@ -102,7 +104,8 @@
       "label": "ok",
       "status": "weak",
       "support": 0.33,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": false
     },
     {
       "id": "V04",
@@ -115,7 +118,8 @@
       "label": "ok",
       "status": "weak",
       "support": 0.4,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": false
     },
     {
       "id": "V05",
@@ -128,7 +132,8 @@
       "label": "ok",
       "status": "weak",
       "support": 0.42,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": false
     },
     {
       "id": "V06",
@@ -140,7 +145,8 @@
       "label": "ok",
       "status": "weak",
       "support": 0.47,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": false
     },
     {
       "id": "V07",
@@ -152,7 +158,8 @@
       "label": "ok",
       "status": "supported",
       "support": 0.66,
-      "reason": ""
+      "reason": "",
+      "blocks": false
     },
     {
       "id": "V08",
@@ -165,7 +172,8 @@
       "label": "ok",
       "status": "weak",
       "support": 0.28,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": false
     },
     {
       "id": "V09",
@@ -177,7 +185,8 @@
       "label": "number",
       "status": "unsupported",
       "support": 0.6,
-      "reason": "數字「兩」不在引用的逐字稿中"
+      "reason": "數字「兩」不在引用的逐字稿中",
+      "blocks": true
     },
     {
       "id": "V10",
@@ -189,7 +198,8 @@
       "label": "number",
       "status": "unsupported",
       "support": 0.1,
-      "reason": "數字「八十」不在引用的逐字稿中"
+      "reason": "數字「八十」不在引用的逐字稿中",
+      "blocks": true
     },
     {
       "id": "V11",
@@ -201,7 +211,8 @@
       "label": "time",
       "status": "unsupported",
       "support": 0.08,
-      "reason": "時間詞「昨天」不在引用的逐字稿中"
+      "reason": "時間詞「昨天」不在引用的逐字稿中",
+      "blocks": true
     },
     {
       "id": "V12",
@@ -213,7 +224,8 @@
       "label": "time",
       "status": "unsupported",
       "support": 0.5,
-      "reason": "時間詞「這週」不在引用的逐字稿中"
+      "reason": "時間詞「這週」不在引用的逐字稿中",
+      "blocks": true
     },
     {
       "id": "V13",
@@ -225,7 +237,8 @@
       "label": "pronoun",
       "status": "unsupported",
       "support": 0.33,
-      "reason": "代名詞「她」不在引用的逐字稿中，請確認指的是誰"
+      "reason": "代名詞「她」不在引用的逐字稿中，請確認指的是誰",
+      "blocks": true
     },
     {
       "id": "V14",
@@ -237,7 +250,8 @@
       "label": "contradiction",
       "status": "unsupported",
       "support": 0.0,
-      "reason": "時間詞「這週」不在引用的逐字稿中"
+      "reason": "時間詞「這週」不在引用的逐字稿中",
+      "blocks": true
     },
     {
       "id": "V15",
@@ -249,7 +263,8 @@
       "label": "fabrication",
       "status": "unsupported",
       "support": 0.0,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": true
     },
     {
       "id": "V16",
@@ -261,7 +276,8 @@
       "label": "fabrication",
       "status": "unsupported",
       "support": 0.09,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": true
     },
     {
       "id": "V17",
@@ -273,7 +289,8 @@
       "label": "speaker",
       "status": "unsupported",
       "support": 0.0,
-      "reason": "句子寫個案表示，但引用的都是心理師的話"
+      "reason": "句子寫個案表示，但引用的都是心理師的話",
+      "blocks": true
     },
     {
       "id": "V18",
@@ -285,7 +302,8 @@
       "label": "hedge",
       "status": "supported",
       "support": 0.71,
-      "reason": ""
+      "reason": "",
+      "blocks": false
     },
     {
       "id": "V19",
@@ -297,7 +315,8 @@
       "label": "diagnosis",
       "status": "unsupported",
       "support": 0.0,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": true
     },
     {
       "id": "V20",
@@ -309,7 +328,8 @@
       "label": "citation",
       "status": "unsupported",
       "support": 0.0,
-      "reason": "時間詞「每天」不在引用的逐字稿中"
+      "reason": "時間詞「每天」不在引用的逐字稿中",
+      "blocks": true
     },
     {
       "id": "V21",
@@ -321,7 +341,8 @@
       "label": "ok",
       "status": "supported",
       "support": 0.56,
-      "reason": ""
+      "reason": "",
+      "blocks": false
     },
     {
       "id": "V22",
@@ -333,7 +354,8 @@
       "label": "ok",
       "status": "unsupported",
       "support": 0.12,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": true
     },
     {
       "id": "V23",
@@ -346,7 +368,8 @@
       "label": "ok",
       "status": "weak",
       "support": 0.38,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": false
     },
     {
       "id": "V24",
@@ -358,7 +381,8 @@
       "label": "ok",
       "status": "weak",
       "support": 0.25,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": false
     },
     {
       "id": "V25",
@@ -370,7 +394,8 @@
       "label": "ok",
       "status": "weak",
       "support": 0.46,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": false
     },
     {
       "id": "V26",
@@ -383,7 +408,8 @@
       "label": "ok",
       "status": "weak",
       "support": 0.47,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": false
     },
     {
       "id": "V27",
@@ -395,7 +421,8 @@
       "label": "negation",
       "status": "unsupported",
       "support": 0.0,
-      "reason": "風險相關句的否定語與逐字稿不一致，請確認語意沒有被反轉"
+      "reason": "風險相關句的否定語與逐字稿不一致，請確認語意沒有被反轉",
+      "blocks": true
     },
     {
       "id": "V28",
@@ -407,7 +434,8 @@
       "label": "negation",
       "status": "unsupported",
       "support": 0.0,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": true
     },
     {
       "id": "V29",
@@ -419,7 +447,8 @@
       "label": "negation",
       "status": "weak",
       "support": 0.25,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": true
     },
     {
       "id": "V30",
@@ -431,7 +460,8 @@
       "label": "intensity",
       "status": "unsupported",
       "support": 0.18,
-      "reason": "時間詞「每天」不在引用的逐字稿中"
+      "reason": "時間詞「每天」不在引用的逐字稿中",
+      "blocks": true
     },
     {
       "id": "V31",
@@ -443,7 +473,8 @@
       "label": "number",
       "status": "unsupported",
       "support": 0.43,
-      "reason": "數字「六」不在引用的逐字稿中"
+      "reason": "數字「六」不在引用的逐字稿中",
+      "blocks": true
     },
     {
       "id": "V32",
@@ -455,7 +486,8 @@
       "label": "number",
       "status": "unsupported",
       "support": 0.71,
-      "reason": "數字「五」不在引用的逐字稿中"
+      "reason": "數字「五」不在引用的逐字稿中",
+      "blocks": true
     },
     {
       "id": "V33",
@@ -467,7 +499,8 @@
       "label": "time",
       "status": "unsupported",
       "support": 0.25,
-      "reason": "時間詞「下週」不在引用的逐字稿中"
+      "reason": "時間詞「下週」不在引用的逐字稿中",
+      "blocks": true
     },
     {
       "id": "V34",
@@ -479,7 +512,8 @@
       "label": "pronoun",
       "status": "unsupported",
       "support": 0.5,
-      "reason": "代名詞「他」不在引用的逐字稿中，請確認指的是誰"
+      "reason": "代名詞「他」不在引用的逐字稿中，請確認指的是誰",
+      "blocks": true
     },
     {
       "id": "V35",
@@ -491,7 +525,8 @@
       "label": "intensity",
       "status": "unsupported",
       "support": 0.0,
-      "reason": "風險相關句的否定語與逐字稿不一致，請確認語意沒有被反轉"
+      "reason": "風險相關句的否定語與逐字稿不一致，請確認語意沒有被反轉",
+      "blocks": true
     },
     {
       "id": "V36",
@@ -504,7 +539,8 @@
       "label": "fabrication",
       "status": "unsupported",
       "support": 0.1,
-      "reason": "風險相關句的否定語與逐字稿不一致，請確認語意沒有被反轉"
+      "reason": "風險相關句的否定語與逐字稿不一致，請確認語意沒有被反轉",
+      "blocks": true
     },
     {
       "id": "V37",
@@ -517,7 +553,8 @@
       "label": "contradiction",
       "status": "weak",
       "support": 0.33,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": false
     },
     {
       "id": "V38",
@@ -529,7 +566,8 @@
       "label": "contradiction",
       "status": "unsupported",
       "support": 0.0,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": true
     },
     {
       "id": "V39",
@@ -542,7 +580,8 @@
       "label": "ok",
       "status": "unsupported",
       "support": 0.19,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": true
     },
     {
       "id": "V40",
@@ -554,7 +593,8 @@
       "label": "ok",
       "status": "weak",
       "support": 0.38,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": false
     },
     {
       "id": "V41",
@@ -566,7 +606,8 @@
       "label": "ok",
       "status": "supported",
       "support": 0.72,
-      "reason": ""
+      "reason": "",
+      "blocks": false
     },
     {
       "id": "V42",
@@ -578,7 +619,8 @@
       "label": "ok",
       "status": "supported",
       "support": 0.78,
-      "reason": ""
+      "reason": "",
+      "blocks": false
     },
     {
       "id": "V43",
@@ -590,7 +632,8 @@
       "label": "number",
       "status": "unsupported",
       "support": 0.38,
-      "reason": "數字「九十」不在引用的逐字稿中"
+      "reason": "數字「九十」不在引用的逐字稿中",
+      "blocks": true
     },
     {
       "id": "V44",
@@ -602,7 +645,8 @@
       "label": "contradiction",
       "status": "weak",
       "support": 0.44,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": false
     },
     {
       "id": "V45",
@@ -614,7 +658,8 @@
       "label": "contradiction",
       "status": "unsupported",
       "support": 0.14,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": true
     },
     {
       "id": "V46",
@@ -626,7 +671,8 @@
       "label": "number",
       "status": "unsupported",
       "support": 0.58,
-      "reason": "時間詞「下週」不在引用的逐字稿中"
+      "reason": "時間詞「下週」不在引用的逐字稿中",
+      "blocks": true
     },
     {
       "id": "V47",
@@ -638,7 +684,8 @@
       "label": "speaker",
       "status": "unsupported",
       "support": 0.0,
-      "reason": "句子寫個案表示，但引用的都是心理師的話"
+      "reason": "句子寫個案表示，但引用的都是心理師的話",
+      "blocks": true
     },
     {
       "id": "V48",
@@ -650,7 +697,8 @@
       "label": "diagnosis",
       "status": "unsupported",
       "support": 0.0,
-      "reason": "與引用段落的用字重疊少，請確認"
+      "reason": "與引用段落的用字重疊少，請確認",
+      "blocks": true
     }
   ]
 }
