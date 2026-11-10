@@ -39,7 +39,30 @@ def _whisper_model():
     return _whisper
 
 
-PROMPT = "以下是心理諮商會談的逐字稿，使用繁體中文。"
+def asr_prompt() -> str:
+    if config.ASR_PROMPT is not None:
+        return config.ASR_PROMPT
+    return "" if config.ASR_BACKEND == "openai" else "以下是心理諮商會談的逐字稿，使用繁體中文。"
+
+
+_HALF = {",": "，", "?": "？", "!": "！", ";": "；", ":": "："}
+_HALF_RE = re.compile(r"(?<![0-9A-Za-z])[,?!;:]|[,?!;:](?![0-9A-Za-z])")
+_opencc = None
+
+
+def _clean(text: str) -> str:
+    """Whisper may write half-width punctuation or Simplified characters. The risk
+    lexicon and the verifier rules are written in Traditional Chinese with full-width
+    punctuation, so the transcript is brought to that form before any agent reads it."""
+    global _opencc
+    text = _HALF_RE.sub(lambda m: _HALF[m.group()], text.strip())
+    if _opencc is None:
+        try:
+            from opencc import OpenCC  # optional: pip install opencc-python-reimplemented
+            _opencc = OpenCC("s2twp").convert
+        except ImportError:
+            _opencc = False
+    return _opencc(text) if _opencc else text
 
 
 class ASRError(Exception):
@@ -60,7 +83,7 @@ def _sentences(text: str, duration: float) -> list[tuple[float, float, str]]:
 
 
 def _faster_whisper(audio_path: Path) -> list[tuple[float, float, str]]:
-    raw_segments, _info = _whisper_model().transcribe(str(audio_path), language="zh", vad_filter=True, initial_prompt=PROMPT)
+    raw_segments, _info = _whisper_model().transcribe(str(audio_path), language="zh", vad_filter=True, initial_prompt=asr_prompt() or None)
     return [(s.start, s.end, s.text) for s in raw_segments]
 
 
@@ -71,7 +94,9 @@ def _openai_server(audio_path: Path) -> list[tuple[float, float, str]]:
 
     assert_local(config.ASR_URL)
     boundary = uuid.uuid4().hex
-    fields = {"model": config.ASR_MODEL, "language": "zh", "prompt": PROMPT, "response_format": "verbose_json"}
+    fields = {"model": config.ASR_MODEL, "language": "zh", "response_format": "verbose_json"}
+    if asr_prompt():
+        fields["prompt"] = asr_prompt()
     body = b"".join(
         f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n".encode() for k, v in fields.items()
     ) + (
@@ -111,7 +136,7 @@ def transcribe_audio(audio_path: Path, session_id: str, client_id: str, session_
     """Speech to timestamped segments. Speakers are left "unknown" for the speaker agent."""
     raw = _openai_server(audio_path) if config.ASR_BACKEND == "openai" else _faster_whisper(audio_path)
     # Number only the segments with words, so ids stay 1, 2, 3… for citations.
-    spoken = [(start, end, text.strip()) for start, end, text in raw if text.strip()]
+    spoken = [(start, end, _clean(text)) for start, end, text in raw if text.strip()]
     segments = [
         Segment(id=i, start=round(start, 1), end=round(end, 1), speaker="unknown", text=text, speaker_source="none")
         for i, (start, end, text) in enumerate(spoken, start=1)

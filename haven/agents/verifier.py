@@ -29,6 +29,9 @@ _PRONOUN = re.compile(r"[他她]")
 _SAME_TIME = {"本週": "這週", "這一週": "這週", "這個禮拜": "這週", "下禮拜": "下週", "上禮拜": "上週"}
 # The sentence says the client said it; at least one cited line must be the client's.
 _CLIENT_SAID = re.compile(r"^個案(?:表示|自述|提到|說)")
+# The mirror case, seen from Qwen3-32B on a 36-minute session: "心理師認為…" written
+# over lines only the client spoke, so an assessment nobody voiced reads as the therapist's.
+_THERAPIST_SAID = re.compile(r"^心理師(?:觀察到|注意到|認為|評估|判斷|建議|指出|表示|說明|提到|提醒|鼓勵|肯定)")
 # Risk statements where a dropped or added negation reverses the meaning
 # ("沒有具體計畫" vs. "有具體計畫"). These are the sentences that matter most.
 # 計畫 and 工具 count only in their risk sense, so "讀書計畫" is not a risk sentence.
@@ -93,6 +96,9 @@ class Verifier:
             if _CLIENT_SAID.search(s.text) and all(segs[e].speaker == "therapist" for e in s.evidence):
                 s.status, s.support, s.reason = "unsupported", 0.0, "句子寫個案表示，但引用的都是心理師的話" + ("（說話者為模型推測）" if any(segs[e].speaker_source != "script" for e in s.evidence) else "")
                 continue
+            if _THERAPIST_SAID.search(s.text) and all(segs[e].speaker == "client" for e in s.evidence):
+                s.status, s.support, s.reason = "unsupported", 0.0, "句子寫心理師的看法或建議，但引用的都是個案的話" + ("（說話者為模型推測）" if any(segs[e].speaker_source != "script" for e in s.evidence) else "")
+                continue
             s.support = round(max(overlap(s.text, c) for c in cited), 2)
             violation = rule_violation(s.text, source)
             if violation:
@@ -121,7 +127,7 @@ class Verifier:
             # Uploaded audio: who said a line is the model's guess, so a sentence
             # about what the client said, or about risk, waits for the therapist.
             guessed = any(segs[e].speaker_source != "script" for e in s.evidence if e in segs)
-            if guessed and s.status == "supported" and (_CLIENT_SAID.search(s.text) or _RISK_TERM.search(s.text)):
+            if guessed and s.status == "supported" and (_CLIENT_SAID.search(s.text) or _THERAPIST_SAID.search(s.text) or _RISK_TERM.search(s.text)):
                 s.status, s.reason = "weak", "引用段落的說話者由本機模型推測，請確認是誰說的"
             s.must_confirm = s.status == "weak" and bool(_RISK_TERM.search(s.text))
         # Score lines are not claims about the session; leave them out of the ratio.

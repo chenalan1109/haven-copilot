@@ -4,6 +4,7 @@
     python3 scripts/benchmark.py --rooms 4       # also N sessions at once (N therapy rooms)
     python3 scripts/benchmark.py --label b70-vllm-qwen27b
     python3 scripts/benchmark.py --repeat 3      # each session 3 times; tables show the median
+    python3 scripts/benchmark.py --sessions C002-L50 --rooms 2   # the 50-minute session (scripts/make_long_session.py)
 
 Every sentence the verifier did not pass also goes to docs/benchmarks/<label>-review.csv,
 one row per sentence, with an empty column for a clinician to mark it a real error
@@ -119,6 +120,7 @@ def main():
     ap.add_argument("--rooms", type=int, default=0, help="also run this many sessions at once")
     ap.add_argument("--label", default=None)
     ap.add_argument("--repeat", type=int, default=1, help="run each session this many times (median reported)")
+    ap.add_argument("--sessions", default=None, help="comma-separated session ids instead of every demo session, e.g. C002-L50")
     args = ap.parse_args()
 
     tmp = tempfile.TemporaryDirectory()
@@ -127,7 +129,7 @@ def main():
     llm = get_llm()
     engine = llm.label if llm else "rule-based demo"
     label = args.label or f"{platform.machine()}-{engine.replace(':', '-').replace('/', '-')}"
-    sessions = [s for c in load_clients() for s in c.get("sessions", [])]
+    sessions = args.sessions.split(",") if args.sessions else [s for c in load_clients() for s in c.get("sessions", [])]
 
     print(f"engine: {engine}")
     sequential = []

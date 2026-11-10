@@ -94,6 +94,11 @@ class VerifierTest(unittest.TestCase):
         status, _ = self.check("個案表示下週想練習向主管提出合理的工作量。", [17])
         self.assertEqual(status, "unsupported")
 
+    def test_client_words_written_as_the_therapists_view(self):
+        # Seen on the B70: "心理師認為…" over lines only the client spoke.
+        status, _ = self.check("心理師認為個案的睡眠問題與工作壓力有關。", [4])
+        self.assertEqual(status, "unsupported")
+
     def test_rule_based_notes_pass_verification(self):
         for sid in ("C001-S03", "C001-S04", "C002-S05"):
             t = load_transcript(sid)

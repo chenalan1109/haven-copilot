@@ -5,9 +5,13 @@
 #   bash scripts/b70-vllm.sh Qwen/Qwen3-14B qwen3-14b --quantization fp8
 #   CARD=1 bash scripts/b70-vllm.sh ...        # use the second card
 #
-# Speech-to-text on the same card, next to the note model (both servers share the 32GB):
-#   UTIL=0.7 bash scripts/b70-vllm.sh Qwen/Qwen3-32B-AWQ qwen3-32b-awq
-#   PORT=8001 UTIL=0.15 CONTAINER=vllm-asr bash scripts/b70-vllm.sh openai/whisper-large-v3-turbo whisper --max-model-len 448
+# Speech-to-text on the same card, next to the note model. Start Whisper first and wait
+# until it answers before starting the note model: two servers loading at once upset
+# each other's memory check. Measured: Whisper leaves 24.5 of 30.3 GiB free, so the
+# note model gets at most UTIL=0.8 (4.9 GiB of context cache next to 18.1 GiB of weights).
+#   PORT=8001 UTIL=0.12 CONTAINER=vllm-asr bash scripts/b70-vllm.sh openai/whisper-large-v3-turbo whisper --max-model-len 448
+#   until curl -s 127.0.0.1:8001/v1/models | grep -q whisper; do sleep 3; done
+#   UTIL=0.8 bash scripts/b70-vllm.sh Qwen/Qwen3-32B-AWQ qwen3-32b-awq
 #
 # Then: HAVEN_LLM=openai HAVEN_MODEL=qwen3-8b python3 -m haven
 # The server listens on 127.0.0.1:8000 only. Model weights are cached in ~/hf.

@@ -85,6 +85,16 @@ class OpenAITranscriptionTest(unittest.TestCase):
         self.assertIn(b"RIFF-fake-audio", FakeWhisper.seen["body"])
         self.assertIn(b'name="language"\r\n\r\nzh', FakeWhisper.seen["body"])
 
+    def test_no_prompt_for_the_local_server_by_default(self):
+        # Measured on the B70: a prompt made whisper-large-v3-turbo drop the last utterance.
+        transcript.transcribe_audio(self.audio, "T-S01", "C001", 1, "2026-11-08")
+        self.assertNotIn(b'name="prompt"', FakeWhisper.seen["body"])
+
+    def test_half_width_punctuation_is_normalised(self):
+        FakeWhisper.reply = (200, {"segments": [{"start": 0, "end": 3, "text": "有想過,但是沒有真的想要怎麼做?大概3,000元"}]})
+        t = transcript.transcribe_audio(self.audio, "T-S01", "C001", 1, "2026-11-08")
+        self.assertEqual(t.segments[0].text, "有想過，但是沒有真的想要怎麼做？大概3,000元")
+
     def test_refuses_cloud_transcription(self):
         config.ASR_URL = "https://api.openai.com"
         with self.assertRaises(NonLocalEndpointError):

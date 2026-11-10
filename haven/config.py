@@ -24,6 +24,10 @@ ASR_TIMEOUT = float(os.environ.get("HAVEN_ASR_TIMEOUT", "900"))
 ASR_BACKEND = os.environ.get("HAVEN_ASR", "faster-whisper")
 ASR_URL = os.environ.get("HAVEN_ASR_URL", "http://127.0.0.1:8001")
 ASR_MODEL = os.environ.get("HAVEN_ASR_MODEL", "small" if ASR_BACKEND == "faster-whisper" else "whisper")
+# Text given to Whisper before the audio. Empty for the vLLM server: measured on the B70
+# with whisper-large-v3-turbo, a prompt made it drop or repeat the last utterance of a clip.
+# Unset means the default for the backend (see transcript.asr_prompt).
+ASR_PROMPT = os.environ.get("HAVEN_ASR_PROMPT")
 
 HOST = os.environ.get("HAVEN_HOST", "127.0.0.1")
 PORT = int(os.environ.get("HAVEN_PORT", "8765"))

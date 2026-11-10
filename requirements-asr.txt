@@ -1,1 +1,3 @@
 faster-whisper>=1.0
+# Optional: converts Simplified characters in a transcript to Traditional (Taiwan).
+opencc-python-reimplemented>=0.1.7
