@@ -122,6 +122,13 @@ python3 scripts/benchmark.py --rooms 4
 
 Processes every demo session, then four at once (four therapy rooms), and writes per-agent times, token counts and tokens per second to `docs/benchmarks/`. It uses a throwaway database. Results so far are in [docs/benchmarks](docs/benchmarks).
 
+```bash
+python3 scripts/benchmark.py --repeat 3 --rooms 4
+python3 scripts/review_summary.py docs/benchmarks/<label>-review.csv
+```
+
+Notes vary from run to run, so `--repeat 3` runs each session three times and reports the median. Every sentence the verifier did not pass goes to `<label>-review.csv` with the transcript lines it cited; a clinician marks each one `real_error` (the note was wrong and was caught) or `wrongly_blocked` (the sentence was fine). `review_summary.py` turns the marked sheet into three numbers per session: passed, real errors caught, wrongly blocked, plus flagged sentences per note (the therapist's extra clicks).
+
 ### Measuring the verifier
 
 ```bash
