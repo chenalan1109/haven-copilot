@@ -30,10 +30,34 @@ function el(tag, attrs = {}, ...children) {
 async function api(path, opts = {}) {
   // The server refuses POSTs without this header (cross-site request protection).
   if (opts.method === "POST") opts.headers = { ...(opts.headers || {}), "X-Haven": "1" };
-  const res = await fetch(path, opts);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || res.statusText);
+  let res, data = {};
+  try {
+    res = await fetch(path, opts);
+  } catch (err) {
+    throw new Error("連不上本機的 Haven 伺服器，請確認程式還在執行。");
+  }
+  try { data = await res.json(); } catch (err) { /* not JSON */ }
+  if (!res.ok) {
+    // The server sends a Chinese message for the therapist; fall back to a plain one.
+    const e = new Error(data.message_zh || HTTP_MESSAGES[res.status] || `操作沒有完成（代碼 ${res.status}）。`);
+    e.status = res.status;
+    e.data = data;
+    throw e;
+  }
   return data;
+}
+
+const HTTP_MESSAGES = {
+  400: "送出的資料格式不正確。",
+  403: "伺服器拒絕了這個請求。",
+  404: "找不到這筆資料。",
+  409: "目前的狀態不允許這個操作。",
+  500: "伺服器發生錯誤，請看終端機的訊息。",
+};
+
+function fmtDateTime(iso) {
+  const d = new Date(iso);
+  return isNaN(d) ? iso : d.toLocaleString("zh-TW", { hour12: false });
 }
 
 function fmtTime(sec) {
@@ -173,7 +197,13 @@ async function openClient(id) {
 // ---------- session workspace ----------
 
 async function openSession(sid, focusSeg) {
-  const r = await api(`/api/sessions/${sid}`);
+  let r;
+  try {
+    r = await api(`/api/sessions/${encodeURIComponent(sid)}`);
+  } catch (err) {
+    document.getElementById("main").replaceChildren(el("div", { class: "empty" }, `無法開啟會談：${err.message}`));
+    return;
+  }
   renderSession(r, focusSeg);
 }
 
@@ -193,19 +223,51 @@ function collectNote() {
     sections[sec.dataset.key] = [...sec.querySelectorAll(".sentence")].map((s) => {
       const text = s.querySelector(".txt").textContent.trim();
       const edited = text !== s.dataset.orig;
+      // Only the words, the citations and the therapist's confirmation are sent.
+      // The server works out every status itself and ignores one sent from here.
       return {
         text,
         evidence: JSON.parse(s.dataset.evidence),
-        source: s.dataset.source || "transcript",
-        // Unedited sentences keep their check; edited ones go back to the verifier.
-        status: edited ? "unchecked" : s.dataset.status,
-        support: edited ? 0 : Number(s.dataset.support || 0),
-        reason: edited ? "" : (s.dataset.reason || ""),
+        source: edited ? "transcript" : (s.dataset.source || "transcript"),
         confirmed_by_therapist: confirmed.has(text),
       };
     }).filter((s) => s.text);
   });
-  return { template: currentSession.note.template, engine: currentSession.note.engine, sections };
+  return { template: currentSession.note.template, sections };
+}
+
+function noteEdited() {
+  return [...document.querySelectorAll(".note-section .sentence")].some((s) =>
+    s.querySelector(".txt").textContent.trim() !== (s.dataset.orig || ""));
+}
+
+// High-level risk cues the therapist chose to leave out of the note: segment id -> reason.
+const dismissed = new Map();
+
+function openRiskCues() {
+  return (currentSession.risk_uncovered || []).filter((u) => !dismissed.has(u.segment_id));
+}
+
+function dismissCue(segmentId) {
+  const reason = prompt(`不把 #${segmentId} 的風險線索寫進紀錄的理由（會寫入稽核紀錄）`, "");
+  if (!reason || reason.trim().length < 2) return;
+  dismissed.set(segmentId, reason.trim());
+  renderRiskGate();
+  if (noteEdited()) reverify(); else rerenderNote(); // keeps what the therapist is typing
+}
+
+function renderRiskGate() {
+  const box = document.getElementById("risk-gate");
+  if (!box) return;
+  const locked = !!currentSession.signed;
+  const open = locked ? [] : openRiskCues();
+  const left = locked ? (currentSession.risk_dismissals || []) : [...dismissed].map(([segment_id, reason]) => ({ segment_id, reason }));
+  box.replaceChildren(
+    ...open.map((u) => el("div", { class: "gate-item" },
+      el("span", {}, `#${u.segment_id} 的風險線索（${u.category}）還沒有寫進紀錄：請補寫並引用該段，或註明不寫的理由。`),
+      el("button", { class: "confirm", onclick: () => dismissCue(u.segment_id) }, "不納入紀錄（填理由）"))),
+    ...left.map((d) => el("div", { class: "gate-item done" }, `#${d.segment_id} 未納入紀錄，理由：${d.reason}`)),
+  );
 }
 
 // Flagged sentences the therapist has checked and kept as written.
@@ -213,7 +275,9 @@ const confirmed = new Set();
 
 function sentenceRow(s) {
   const flagged = s.status === "weak" || s.status === "unsupported";
-  const isConfirmed = flagged && confirmed.has(s.text);
+  const locked = !!currentSession.signed;
+  const isMeasure = s.source === "measure";
+  const isConfirmed = flagged && (locked ? !!s.confirmed_by_therapist : confirmed.has(s.text));
   const row = el("div", {
     class: `sentence ${isConfirmed ? "confirmed" : s.status}`,
     "data-evidence": JSON.stringify(s.evidence),
@@ -222,13 +286,14 @@ function sentenceRow(s) {
     "data-support": s.support ?? 0,
     "data-reason": s.reason || "",
     "data-source": s.source || "transcript",
-    title: STATUS_NAMES[s.status] || "",
+    title: isMeasure ? "由量表資料自動填入，不能修改" : (STATUS_NAMES[s.status] || ""),
   },
     el("div", { class: "body" },
-      el("span", { class: "txt", contenteditable: "true", onfocus: () => highlight(s.evidence) }, s.text),
+      // Score lines come from the questionnaire data and a signed note is the record: neither is editable.
+      el("span", { class: "txt", contenteditable: locked || isMeasure ? "false" : "true", onclick: () => highlight(s.evidence), onfocus: () => highlight(s.evidence) }, s.text),
       flagged ? el("div", { class: "reason" },
         isConfirmed ? "心理師已確認" : s.reason,
-        isConfirmed ? null : el("button", { class: "confirm", onclick: () => { confirmed.add(s.text); reverify(); } }, "確認無誤"),
+        isConfirmed || locked ? null : el("button", { class: "confirm", onclick: () => { confirmed.add(s.text); reverify(); } }, "確認無誤"),
       ) : null,
     ),
     el("span", { class: "ev", onclick: () => highlight(s.evidence) }, s.source === "measure" ? "量表" : s.evidence.length ? `#${s.evidence.join(", #")}` : "無來源"),
@@ -241,28 +306,44 @@ function rerenderNote() {
 }
 
 function blockingCount(note) {
-  return Object.values(note.sections).flat().filter((s) => (s.status === "unsupported" || s.must_confirm) && !confirmed.has(s.text)).length;
+  return Object.values(note.sections).flat().filter((s) => (s.status === "unsupported" || s.must_confirm || s.status === "unchecked") && !confirmed.has(s.text)).length;
 }
 
 function renderNote(container, note, verification) {
   container.replaceChildren(
     ...Object.entries(note.sections).map(([key, items]) => el("div", { class: "note-section", "data-key": key },
       el("h4", {}, SECTION_NAMES[key] || key),
-      items.length ? items.map(sentenceRow) : el("div", { class: "sentence", "data-evidence": "[]" }, el("span", { class: "txt", contenteditable: "true" }, "")),
+      items.length ? items.map(sentenceRow)
+        : currentSession.signed ? el("div", { class: "sentence empty-section" }, "（無）")
+        : el("div", { class: "sentence", "data-evidence": "[]", "data-orig": "" }, el("span", { class: "txt", contenteditable: "true" }, "")),
     )),
   );
-  const blocking = blockingCount(note);
   const bar = document.getElementById("verify-summary");
-  bar.textContent = `驗證 agent：${verification.supported}/${verification.total} 句用字與引用段落相符` +
+  const counts = `${verification.supported}/${verification.total} 句用字與引用段落相符` +
     (verification.weak ? `，${verification.weak} 句支持不足` : "") +
-    (verification.unsupported ? `，${verification.unsupported} 句無支持證據` : "") +
-    (blocking ? `（尚有 ${blocking} 句需修改、刪除或確認才能簽核）` : "");
-  document.getElementById("sign-btn").disabled = blocking > 0 || !!currentSession.signature;
+    (verification.unsupported ? `，${verification.unsupported} 句無支持證據` : "");
+  if (currentSession.signed) {
+    bar.textContent = `簽核時的驗證結果：${counts}`;
+    return;
+  }
+  const blocking = blockingCount(note);
+  const cues = openRiskCues().length;
+  bar.textContent = `驗證 agent：${counts}` +
+    (blocking ? `（尚有 ${blocking} 句需修改、刪除或確認才能簽核）` : "") +
+    (cues ? `（尚有 ${cues} 則風險線索未寫入紀錄）` : "") +
+    (verification.total === 0 ? "（紀錄是空的，不能簽核）" : "");
+  document.getElementById("sign-btn").disabled = signBlocked();
+}
+
+function signBlocked() {
+  return blockingCount(currentSession.note) > 0 || openRiskCues().length > 0 || currentSession.verification.total === 0;
 }
 
 function renderSession(r, focusSeg) {
   currentSession = r;
   confirmed.clear(); // confirmations belong to one note
+  dismissed.clear();
+  const locked = !!r.signed;
   const main = document.getElementById("main");
   const riskSegs = new Set(r.risk.flags.map((f) => f.segment_id));
 
@@ -297,20 +378,23 @@ function renderSession(r, focusSeg) {
   );
 
   const noteBox = el("div", {});
-  const signBtn = el("button", { class: "primary", id: "sign-btn", onclick: sign }, "確認並簽核");
-  const notePanel = el("section", { class: "card" },
-    el("h3", {}, `紀錄草稿（${r.note.template}）`, el("small", {}, "Draft note — edit before signing")),
+  const notePanel = el("section", { class: `card${locked ? " locked" : ""}` },
+    locked
+      ? el("h3", {}, `已簽核紀錄（${r.note.template}）`, el("small", {}, "唯讀；更正請另寫補充說明 Signed — read-only"))
+      : el("h3", {}, `紀錄草稿（${r.note.template}）`, el("small", {}, "Draft note — edit before signing")),
     riskPanel,
+    el("div", { id: "risk-gate" }),
     noteBox,
     el("div", { class: "verify-bar" },
       el("span", { id: "verify-summary" }),
-      el("div", { class: "actions" },
+      locked ? null : el("div", { class: "actions" },
         el("button", { onclick: addTestSentence, title: "加入一句逐字稿中沒有的內容，示範驗證 agent 會抓出來" }, "加入測試句"),
-        el("button", { onclick: reverify }, "重新驗證"),
-        signBtn,
+        el("button", { onclick: () => reverify() }, "重新驗證"),
+        el("button", { class: "primary", id: "sign-btn", onclick: sign }, "確認並簽核"),
       ),
     ),
-    el("div", { id: "sign-status" }, r.signature ? el("span", { class: "signed" }, `已由 ${r.signature.signed_by} 於 ${r.signature.signed_at} 簽核`) : null),
+    el("div", { id: "sign-status", role: "status" }),
+    locked ? signedBox(r) : null,
   );
 
   const head = el("div", { class: "session-head" },
@@ -325,43 +409,111 @@ function renderSession(r, focusSeg) {
   );
 
   main.replaceChildren(head, el("div", { class: "workspace" }, transcript, notePanel));
+  renderRiskGate();
   renderNote(noteBox, r.note, r.verification);
   if (focusSeg) highlight([focusSeg]);
   noteBox.dataset.ready = "1";
 }
 
-async function reverify() {
-  const r = await api(`/api/sessions/${currentSession.session_id}/verify`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(collectNote()),
+function showMessage(text, bad) {
+  const box = document.getElementById("sign-status");
+  if (box) box.replaceChildren(el("span", { class: bad ? "problem" : "" }, text));
+}
+
+// Signature details and the addenda of a signed note. The note above stays as signed.
+function signedBox(r) {
+  const sig = r.signature;
+  const list = el("div", { class: "addenda" });
+  const draw = (items) => list.replaceChildren(...items.map((a) => el("div", { class: "addendum" },
+    el("div", { class: "meta" }, `補充說明・${a.author}・${fmtDateTime(a.created_at)}`), el("div", {}, a.text))));
+  draw(r.addenda || []);
+  const form = el("form", { class: "addendum-form" },
+    el("textarea", { name: "text", rows: "2", required: true, maxlength: "4000", placeholder: "補充說明（只能新增，不會改動已簽核的紀錄）", "aria-label": "補充說明" }),
+    el("input", { type: "text", name: "author", required: true, maxlength: "80", value: sig.signed_by, "aria-label": "姓名" }),
+    el("button", { type: "submit" }, "新增補充說明"),
+  );
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const out = await api(`/api/sessions/${encodeURIComponent(r.session_id)}/addendum`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: form.text.value, author: form.author.value }),
+      });
+      draw(out.addenda);
+      form.text.value = "";
+      showMessage("已新增補充說明。");
+    } catch (err) {
+      showMessage(`無法新增補充說明：${err.message}`, true);
+    }
   });
+  return el("div", { class: "signed-box" },
+    el("div", { class: "signed" }, `已由 ${sig.signed_by} 於 ${fmtDateTime(sig.signed_at)} 簽核`),
+    sig.note_sha256 ? el("div", { class: "hashes", title: "簽核時由伺服器計算，用來核對紀錄與逐字稿之後沒有被改動" },
+      `紀錄雜湊 ${sig.note_sha256.slice(0, 16)}…・逐字稿雜湊 ${sig.transcript_sha256.slice(0, 16)}…・驗證規則版本 ${sig.verifier_version}`) : null,
+    list, form);
+}
+
+async function reverify() {
+  let r;
+  try {
+    r = await api(`/api/sessions/${encodeURIComponent(currentSession.session_id)}/verify`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(collectNote()),
+    });
+  } catch (err) {
+    showMessage(`無法重新驗證：${err.message}`, true);
+    if (err.status === 409) openSession(currentSession.session_id); // signed elsewhere: show the record
+    return false;
+  }
   currentSession.note = r.note;
   currentSession.verification = r.verification;
+  currentSession.risk_uncovered = r.risk_uncovered;
+  renderRiskGate();
   rerenderNote();
+  return true;
 }
 
 function addTestSentence() {
   const first = document.querySelector(".note-section");
   const row = sentenceRow({ text: "個案表示與母親關係良好，最近常一起出遊。", evidence: [], status: "unchecked" });
+  row.dataset.orig = "";
   first.append(row);
   reverify();
 }
 
+let signing = false;
+
 async function sign() {
-  const by = prompt("簽核心理師姓名", "王心理師");
-  if (!by) return;
-  let r;
+  if (signing) return;
+  signing = true;
+  const btn = document.getElementById("sign-btn");
+  btn.disabled = true;
   try {
-    r = await api(`/api/sessions/${currentSession.session_id}/sign`, {
+    // The server checks the note again whatever is sent; verifying first shows the
+    // therapist the same result before a name is asked for.
+    if (noteEdited() && !(await reverify())) return;
+    if (signBlocked()) {
+      showMessage("紀錄還不能簽核：請先處理標示的句子，以及還沒寫進紀錄的風險線索。", true);
+      return;
+    }
+    const by = prompt("簽核心理師姓名", "王心理師");
+    if (!by) return;
+    await api(`/api/sessions/${encodeURIComponent(currentSession.session_id)}/sign`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ signed_by: by, note: collectNote() }),
+      body: JSON.stringify({
+        signed_by: by, note: collectNote(),
+        risk_dismissals: [...dismissed].map(([segment_id, reason]) => ({ segment_id, reason })),
+      }),
     });
+    // Show what the server filed, read-only, rather than what this page had.
+    await openSession(currentSession.session_id);
   } catch (err) {
-    document.getElementById("sign-status").textContent = `無法簽核：${err.message}`;
-    return;
+    showMessage(`無法簽核：${err.message}`, true);
+    if (err.data && err.data.risk_uncovered) { currentSession.risk_uncovered = err.data.risk_uncovered; renderRiskGate(); }
+  } finally {
+    signing = false;
+    const b = document.getElementById("sign-btn");
+    if (b) b.disabled = signBlocked();
   }
-  currentSession.signature = r;
-  document.getElementById("sign-status").replaceChildren(el("span", { class: "signed" }, `已由 ${r.signed_by} 於 ${r.signed_at} 簽核`));
-  document.getElementById("sign-btn").disabled = true;
 }
 
 loadStatus();

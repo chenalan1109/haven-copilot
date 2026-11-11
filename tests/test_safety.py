@@ -69,8 +69,11 @@ class ClinicalTest(unittest.TestCase):
         self.assertTrue(all(s["status"] == "supported" for s in objective if s["source"] == "measure"))
 
     def test_measure_sentence_needs_no_transcript_evidence(self):
-        note = Note("SOAP", {"O": [NoteSentence("PHQ-9 18 分（中重度）。", [], source="measure")]}, "test")
-        self.assertTrue(Verifier().run(note, load_transcript("C001-S04"))["ready_to_sign"])
+        line = "PHQ-9 18 分（中重度），初次 14 分，第 9 題 1 分。"
+        self.assertIn(line, Orchestrator(use_llm=False).measure_sentences(get_client("C001"), 4))
+        note = Note("SOAP", {"O": [NoteSentence(line, [], source="measure")]}, "test")
+        Verifier().run(note, load_transcript("C001-S04"), [line])
+        self.assertEqual(note.sections["O"][0].status, "supported")
 
 
 def _free_port() -> int:
@@ -116,10 +119,10 @@ class ServerTest(unittest.TestCase):
 
     def test_sign_rules(self):
         h = {"X-Haven": "1", "Content-Type": "application/json"}
-        bad = {"S": [{"text": "個案表示與母親關係良好。", "status": "unsupported", "confirmed_by_therapist": False}]}
+        self.assertEqual(self.call("/api/sessions/C002-S05")[0], 200)  # the server drafts the note first
+        # The status sent by the browser is ignored: this sentence is not in the transcript.
+        bad = {"S": [{"text": "個案表示與母親關係良好。", "status": "supported", "confirmed_by_therapist": False}]}
         self.assertEqual(self.call("/api/sessions/C002-S05/sign", {"signed_by": "王", "note": {"sections": bad}}, h)[0], 409)
-        unchecked = {"S": [{"text": "改過的句子。", "status": "unchecked"}]}
-        self.assertEqual(self.call("/api/sessions/C002-S05/sign", {"signed_by": "王", "note": {"sections": unchecked}}, h)[0], 409)
         kept = {"S": [dict(bad["S"][0], confirmed_by_therapist=True)]}
         self.assertEqual(self.call("/api/sessions/C002-S05/sign", {"signed_by": "王", "note": {"sections": kept}}, h)[0], 200)
         # A signed note is never overwritten.

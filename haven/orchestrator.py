@@ -5,15 +5,15 @@ from __future__ import annotations
 import json
 import time
 
-from . import config, store
+from . import config, signing, store
 from .agents.memory import CaseMemory
 from .agents.outcome import OutcomeAgent
 from .agents.risk import RiskAgent
 from .agents.speakers import SpeakerAgent
-from .agents.verifier import Verifier
+from .agents.verifier import VERIFIER_VERSION, Verifier
 from .agents.writer import NoteWriter
 from .llm import get_llm
-from .models import NoteSentence, to_dict
+from .models import Note, NoteSentence, to_dict
 from .transcript import load_transcript
 
 
@@ -42,7 +42,16 @@ class Orchestrator:
     def engine(self) -> str:
         return self.llm.label if self.llm else "rule-based demo"
 
+    def measure_sentences(self, client: dict, session_no: int) -> list[str]:
+        """The score lines for one session, built from the questionnaire data. These
+        are the only sentences accepted as source="measure"."""
+        return [s["text"] for s in self.outcome.note_sentences(client, session_no)]
+
     def process_session(self, session_id: str, template: str = "SOAP") -> dict:
+        # A signed note is the record. Nothing that could replace what the
+        # therapist sees for that session runs after signing.
+        if store.get_signature(session_id):
+            raise store.AlreadySignedError(session_id)
         timings: dict[str, float] = {}
 
         def timed(name, fn, *args):
@@ -56,10 +65,11 @@ class Orchestrator:
         note = timed("writer", self.writer.run, transcript, template)
         # Scores go into the objective section from the questionnaire data itself,
         # so the model never restates (and never misstates) a number.
-        scores = [NoteSentence(s["text"], [], source="measure") for s in self.outcome.note_sentences(client, transcript.session_no)]
+        measures = self.measure_sentences(client, transcript.session_no)
+        scores = [NoteSentence(text, [], source="measure") for text in measures]
         objective = "O" if template == "SOAP" else "D"
         note.sections[objective] = scores + note.sections.get(objective, [])
-        verification = timed("verifier", self.verifier.run, note, transcript)
+        verification = timed("verifier", self.verifier.run, note, transcript, measures)
         risk = timed("risk", self.risk.run, transcript)
         outcome = timed("outcome", self.outcome.run, client)
 
@@ -74,11 +84,36 @@ class Orchestrator:
             "note": to_dict(note),
             "verification": verification,
             "risk": to_dict(risk),
+            # High-level risk cues no note sentence cites yet; signing waits for them.
+            "risk_uncovered": signing.uncovered_risk(to_dict(risk), note),
             "outcome": outcome,
             "timings_ms": timings,
         }
         store.save_result(session_id, result)
+        signing.remember(session_id, note)
         store.audit("process_session", f"{session_id} engine={self.engine}")
+        return result
+
+    def refresh(self, result: dict) -> dict:
+        """Re-checks a stored draft written under older verifier rules: the note
+        text is kept, every sentence is verified again and the risk cues are
+        scanned again."""
+        session_id = result["session_id"]
+        transcript = load_transcript(session_id)
+        measures = self.measure_sentences(get_client(transcript.client_id), transcript.session_no)
+        stored = result["note"]
+        note = Note(stored["template"], {
+            k: [NoteSentence(s["text"], list(s.get("evidence", [])), source="measure" if s["text"] in measures and not s.get("evidence") else "transcript")
+                for s in items]
+            for k, items in stored["sections"].items()
+        }, stored.get("engine", ""))
+        result["verification"] = self.verifier.run(note, transcript, measures)
+        result["note"] = to_dict(note)
+        result["risk"] = to_dict(self.risk.run(transcript))
+        result["risk_uncovered"] = signing.uncovered_risk(result["risk"], note)
+        store.save_result(session_id, result)
+        signing.remember(session_id, note)
+        store.audit("reverify_stored_draft", f"{session_id} verifier={VERIFIER_VERSION}")
         return result
 
     def brief(self, client_id: str) -> dict:

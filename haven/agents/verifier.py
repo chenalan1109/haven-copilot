@@ -9,7 +9,12 @@ Three layers, cheapest first:
 3. For paraphrases that pass the rules but overlap little, one batched call
    to the local LLM.
 Unsupported sentences block signing until the therapist edits, deletes or
-explicitly confirms them.
+explicitly confirms them. So do weak sentences about risk, and weak sentences
+the local model was asked about and rejected.
+
+The verifier never trusts where a sentence claims to come from: a score line
+counts as one only when its text equals a line the server built from the
+questionnaire data (``measures``).
 """
 
 from __future__ import annotations
@@ -21,6 +26,10 @@ from ..textutil import overlap
 
 SUPPORTED = 0.5
 WEAK = 0.25
+# Stored with every signed note and with the cached verdicts. Change it whenever
+# a rule changes, so a verdict from older rules is never reused.
+VERIFIER_VERSION = "2026.11-1"
+MEASURE_MISMATCH = "量表句與系統依量表資料產生的內容不符。量表句不可修改：請還原，或改寫成引用逐字稿的句子"
 
 _TIME = re.compile(r"這週|下週|上週|本週|今天|明天|昨天|下次|上次|每天|每週|週[一二三四五六日]")
 _NUMBER = re.compile(r"\d+|[零一二三四五六七八九十百兩]+(?=多?\s*(?:分|公斤|小時|天|次|點|週|個|年|月|歲|晚))")
@@ -64,8 +73,8 @@ class Verifier:
     def __init__(self, llm=None):
         self.llm = llm
 
-    def _llm_supported(self, pending: list[tuple[int, str, str]]) -> set[int]:
-        """One call for all paraphrased sentences; returns the indexes the model accepts."""
+    def _llm_verdicts(self, pending: list[tuple[int, str, str]]) -> dict[int, bool]:
+        """One call for all paraphrased sentences; returns the model's yes or no per index."""
         items = "\n\n".join(f"<{i}>\n逐字稿：{source}\n紀錄句子：{claim}" for i, claim, source in pending)
         raw = self.llm.generate_json(
             SYSTEM_PROMPT,
@@ -73,17 +82,25 @@ class Verifier:
             '輸出 {"results": [{"id": 編號, "supported": true 或 false}]}',
         )
         results = raw.get("results", []) if isinstance(raw, dict) else []
-        return {int(r["id"]) for r in results if isinstance(r, dict) and r.get("supported") is True and str(r.get("id")).isdigit()}
+        return {int(r["id"]): r["supported"] for r in results
+                if isinstance(r, dict) and isinstance(r.get("supported"), bool) and str(r.get("id")).isdigit()}
 
-    def run(self, note: Note, t: Transcript) -> dict:
+    def run(self, note: Note, t: Transcript, measures=()) -> dict:
+        """``measures`` are the score lines the server built for this session. A
+        sentence marked source="measure" with any other text is treated as an
+        ordinary, unsupported claim."""
         segs = t.by_id()
+        measures = set(measures)
         pending: list[tuple[int, str, str]] = []
         sentences = note.sentences()
         for i, s in enumerate(sentences):
             if s.status != "unchecked":  # already checked and not edited since
                 continue
-            if s.source == "measure":  # filled in from scores, not from the transcript
+            if s.source == "measure" and s.text in measures:  # filled in from scores, not from the transcript
                 s.status, s.support, s.reason = "supported", 1.0, ""
+                continue
+            if s.source == "measure":  # an edited score line, or other text passed off as one
+                s.source, s.status, s.support, s.reason = "transcript", "unsupported", 0.0, MEASURE_MISMATCH
                 continue
             cited = [segs[e].text for e in s.evidence if e in segs]
             if not s.evidence:
@@ -111,8 +128,12 @@ class Verifier:
                 pending.append((i, s.text, source))
         # Paraphrases score low on overlap; let the local model rule on them.
         if pending and self.llm is not None:
-            accepted = self._llm_supported(pending)
+            verdicts = self._llm_verdicts(pending)
+            accepted = {i for i, ok in verdicts.items() if ok}
             for i, text, _ in pending:
+                # An explicit no from the model holds the sentence for the therapist,
+                # the same as a weak risk sentence.
+                sentences[i].model_rejected = verdicts.get(i) is False
                 if i in accepted and _RISK_TERM.search(text):
                     # A 7B model accepted "否認自殺意念" for a line that never said it.
                     # On risk sentences the model's yes is not enough on its own.
@@ -129,7 +150,7 @@ class Verifier:
             guessed = any(segs[e].speaker_source != "script" for e in s.evidence if e in segs)
             if guessed and s.status == "supported" and (_CLIENT_SAID.search(s.text) or _THERAPIST_SAID.search(s.text) or _RISK_TERM.search(s.text)):
                 s.status, s.reason = "weak", "引用段落的說話者由本機模型推測，請確認是誰說的"
-            s.must_confirm = s.status == "weak" and bool(_RISK_TERM.search(s.text))
+            s.must_confirm = s.status == "weak" and (bool(_RISK_TERM.search(s.text)) or s.model_rejected)
         # Score lines are not claims about the session; leave them out of the ratio.
         claims = [s for s in sentences if s.source != "measure"]
         n = len(claims)
@@ -139,5 +160,8 @@ class Verifier:
             **counts,
             "supported_ratio": round(counts["supported"] / n, 3) if n else 0.0,
             "must_confirm": sum(1 for s in claims if s.must_confirm),
-            "ready_to_sign": counts["unsupported"] == 0 and not any(s.must_confirm for s in claims),
+            # An empty note is not ready: with nothing written there is nothing to check.
+            # The server adds the therapist's confirmations and the risk-coverage gate (haven/signing.py).
+            "ready_to_sign": n > 0 and counts["unsupported"] == 0 and not any(s.must_confirm for s in claims),
+            "verifier_version": VERIFIER_VERSION,
         }

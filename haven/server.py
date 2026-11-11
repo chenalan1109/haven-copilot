@@ -13,9 +13,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import config, store
-from .agents.verifier import _RISK_TERM
-from .models import Note, NoteSentence, to_dict
+from . import config, signing, store
+from .agents.verifier import VERIFIER_VERSION, Verifier
+from .models import to_dict
 from .orchestrator import Orchestrator, get_client, load_clients
 from .transcript import ASRError, load_transcript, save_transcript, transcribe_audio
 
@@ -42,9 +42,56 @@ class BadRequest(ValueError):
 
 
 def _session_id(value: str) -> str:
+    """Session ids are upper case everywhere. On a case-insensitive file system
+    (macOS) "c001-s04" opens the same file as "C001-S04", and without this the
+    one session could be signed twice under two ids."""
     if not SESSION_ID.match(value):
         raise BadRequest("session_id must be letters, digits or '-'")
-    return value
+    return value.upper()
+
+
+class Refused(Exception):
+    """A request the server understands and will not carry out (409)."""
+
+    def __init__(self, message: str, zh: str, **extra):
+        super().__init__(message)
+        self.zh, self.extra = zh, extra
+
+
+def _draft(sid: str) -> tuple[dict, object, list[str]]:
+    """The stored draft, the transcript and the server's score lines for a session
+    that can still be changed."""
+    transcript = load_transcript(sid)  # FileNotFoundError: no such session (404)
+    if store.get_signature(sid):
+        raise Refused("this session is already signed; signed notes are not overwritten",
+                      "這次會談已經簽核，簽核後的紀錄不能再修改。需要更正時，請新增「補充說明」。")
+    result = store.get_result(sid)
+    if result is None:
+        raise Refused("no draft has been produced for this session yet", "這次會談還沒有產生紀錄草稿，請先開啟會談。")
+    measures = ORCH.measure_sentences(get_client(transcript.client_id), transcript.session_no)
+    return result, transcript, measures
+
+
+def _session_view(sid: str) -> dict:
+    """What the session page shows. Once signed, that is the signed note, not the draft."""
+    result = store.get_result(sid)
+    signature = store.get_signature(sid)
+    if result is None:
+        result = ORCH.process_session(sid)
+    elif not signature and result.get("verification", {}).get("verifier_version") != VERIFIER_VERSION:
+        result = ORCH.refresh(result)  # a draft checked under older rules
+    result["signature"] = signature
+    result["signed"] = bool(signature)
+    result["addenda"] = store.get_addenda(sid) if signature else []
+    if signature:
+        note = store.get_signed_note(sid)
+        result["note"] = note
+        result["verification"] = signing.summarize(note)
+        result["risk_dismissals"] = note.get("risk_dismissals", [])
+        result["risk_uncovered"] = []
+    else:
+        result.setdefault("risk_uncovered", signing.uncovered_risk(result["risk"], result["note"]))
+    return result
 
 
 def _client_summary(c: dict) -> dict:
@@ -73,8 +120,9 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _error(self, status, message):
-        self._json({"error": message}, status)
+    def _error(self, status, message, zh=None, **extra):
+        # "error" is for logs and scripts; "message_zh" is what the UI shows the therapist.
+        self._json({"error": message, **({"message_zh": zh} if zh else {}), **extra}, status)
 
     def _host_ok(self) -> bool:
         # Rejects DNS-rebinding: a hostile domain pointed at 127.0.0.1 still
@@ -126,10 +174,7 @@ class Handler(BaseHTTPRequestHandler):
                 store.audit("ask", f"{parts[2]}")
                 return self._json(ORCH.memory.ask(get_client(parts[2]), q))
             if len(parts) == 3 and parts[1] == "sessions":
-                sid = _session_id(parts[2])
-                result = store.get_result(sid) or ORCH.process_session(sid)
-                result["signature"] = store.get_signature(sid)
-                return self._json(result)
+                return self._json(_session_view(_session_id(parts[2])))
             if parts == ["api", "audit"]:
                 return self._json(store.recent_audit())
             return self._error(HTTPStatus.NOT_FOUND, "unknown endpoint")
@@ -148,61 +193,106 @@ class Handler(BaseHTTPRequestHandler):
         query = parse_qs(url.query)
         try:
             if len(parts) == 4 and parts[1] == "sessions":
-                _session_id(parts[2])
-            if len(parts) == 4 and parts[1] == "sessions" and parts[3] == "process":
-                template = query.get("template", ["SOAP"])[0]
-                if template not in ("SOAP", "DAP"):
-                    return self._error(HTTPStatus.BAD_REQUEST, "template must be SOAP or DAP")
-                result = ORCH.process_session(parts[2], template)
-                result["signature"] = None
-                return self._json(result)
-            if len(parts) == 4 and parts[1] == "sessions" and parts[3] == "verify":
-                # Re-checks the sentences the therapist edited (sent as "unchecked"); the rest keep their result.
-                payload = json.loads(self._body() or b"{}")
-                note = Note(
-                    template=payload["template"],
-                    engine=payload.get("engine", ""),
-                    sections={k: [NoteSentence(
-                        text=s["text"],
-                        evidence=[int(e) for e in s.get("evidence", [])],
-                        status=s.get("status", "unchecked"),
-                        support=float(s.get("support", 0.0)),
-                        reason=s.get("reason", ""),
-                        source=s.get("source", "transcript"),
-                    ) for s in v] for k, v in payload["sections"].items()},
-                )
-                verification = ORCH.verifier.run(note, load_transcript(parts[2]))
-                return self._json({"note": to_dict(note), "verification": verification})
-            if len(parts) == 4 and parts[1] == "sessions" and parts[3] == "sign":
-                payload = json.loads(self._body() or b"{}")
-                if not payload.get("signed_by") or "note" not in payload:
-                    return self._error(HTTPStatus.BAD_REQUEST, "signed_by and note are required")
-                # The UI disables signing too, but the rule lives here: no sentence
-                # is filed unchecked, or flagged without the therapist keeping it.
-                sentences = [s for v in payload["note"].get("sections", {}).values() for s in v]
-                blocking = [s["text"] for s in sentences
-                            if s.get("status") not in ("supported", "weak", "unsupported")
-                            or (s.get("status") == "unsupported" and not s.get("confirmed_by_therapist"))
-                            # A weak risk sentence needs the therapist too; checked here, not taken from the payload.
-                            or (s.get("status") == "weak" and _RISK_TERM.search(str(s.get("text", ""))) and not s.get("confirmed_by_therapist"))]
-                if blocking:
-                    return self._error(HTTPStatus.CONFLICT, f"{len(blocking)} sentence(s) unverified, unsupported, or a weak risk sentence; re-verify, edit or confirm them first")
-                kept = sum(1 for s in sentences if s.get("status") != "supported" and s.get("confirmed_by_therapist"))
-                try:
-                    return self._json(store.sign_note(parts[2], payload["note"], payload["signed_by"], kept))
-                except store.AlreadySignedError:
-                    return self._error(HTTPStatus.CONFLICT, "this session is already signed; signed notes are not overwritten")
+                sid = _session_id(parts[2])
+                if parts[3] == "process":
+                    return self._process(sid, query)
+                if parts[3] == "verify":
+                    return self._verify(sid)
+                if parts[3] == "sign":
+                    return self._sign(sid)
+                if parts[3] == "addendum":
+                    return self._addendum(sid)
             if parts == ["api", "upload"]:
                 return self._upload(query)
             return self._error(HTTPStatus.NOT_FOUND, "unknown endpoint")
+        except Refused as e:
+            return self._error(HTTPStatus.CONFLICT, str(e), e.zh, **e.extra)
+        except store.AlreadySignedError:
+            return self._error(HTTPStatus.CONFLICT, "this session is already signed; signed notes are not overwritten",
+                               "這次會談已經簽核，簽核後的紀錄不能再修改。需要更正時，請新增「補充說明」。")
         except (KeyError, FileNotFoundError):
-            return self._error(HTTPStatus.NOT_FOUND, "not found")
+            return self._error(HTTPStatus.NOT_FOUND, "not found", "找不到這次會談。")
         except (ValueError, TypeError, json.JSONDecodeError) as e:
-            return self._error(HTTPStatus.BAD_REQUEST, str(e))
+            return self._error(HTTPStatus.BAD_REQUEST, str(e), "送出的資料格式不正確。")
+
+    def _payload(self) -> dict:
+        payload = json.loads(self._body() or b"{}")
+        if not isinstance(payload, dict):
+            raise BadRequest("the request body must be a JSON object")
+        return payload
+
+    def _process(self, sid, query):
+        template = query.get("template", ["SOAP"])[0]
+        if template not in ("SOAP", "DAP"):
+            return self._error(HTTPStatus.BAD_REQUEST, "template must be SOAP or DAP")
+        result = ORCH.process_session(sid, template)  # refuses a signed session
+        result["signature"], result["signed"], result["addenda"] = None, False, []
+        return self._json(result)
+
+    def _verify(self, sid):
+        """Re-checks the note as the therapist has edited it. Only the sentence
+        texts, their citations and the confirmations are read from the request."""
+        payload = self._payload()
+        result, transcript, measures = _draft(sid)
+        note, verification, _ = signing.check(sid, transcript, payload, result["note"]["template"], result["note"].get("engine", ""), measures, ORCH.verifier)
+        signing.remember(sid, note)
+        store.audit("verify", f"{sid} {verification['supported']}/{verification['total']} supported")
+        return self._json({"note": to_dict(note), "verification": verification,
+                           "risk_uncovered": signing.uncovered_risk(result["risk"], note)})
+
+    def _sign(self, sid):
+        payload = self._payload()
+        signed_by = payload.get("signed_by")
+        if not isinstance(signed_by, str) or not signed_by.strip() or len(signed_by) > 80 or "note" not in payload:
+            return self._error(HTTPStatus.BAD_REQUEST, "signed_by and note are required", "請填寫簽核心理師姓名。")
+        dismissals = signing.parse_dismissals(payload.get("risk_dismissals"))
+        result, transcript, measures = _draft(sid)
+        # The rule lives here, not in the UI. Sentences the server has not judged
+        # before are checked by the rule layers only: fast, and never more lenient
+        # than the full check the therapist saw.
+        note, verification, forged = signing.check(sid, transcript, payload["note"], result["note"]["template"], result["note"].get("engine", ""), measures, Verifier(None))
+        if forged:
+            raise Refused(f"{len(forged)} score line(s) do not match the questionnaire data",
+                          f"有 {len(forged)} 句量表句和量表資料不一致。量表句由系統依量表資料產生，不能修改；請還原後再簽核。", blocking=forged)
+        if verification["total"] == 0:
+            raise Refused("the note has no sentences", "紀錄是空的，不能簽核。請至少寫下一句引用逐字稿的紀錄。")
+        blocking = signing.blocking_sentences(note)
+        if blocking:
+            raise Refused(f"{len(blocking)} sentence(s) unverified, unsupported, or held for confirmation; re-verify, edit or confirm them first",
+                          f"還有 {len(blocking)} 句沒有通過驗證（無支持證據、與風險有關而支持不足，或被本機模型否決）。請先修改、刪除，或逐句按「確認無誤」，再重新驗證。",
+                          blocking=[s.text for s in blocking])
+        risk = to_dict(ORCH.risk.run(transcript))
+        known = {f["segment_id"] for f in risk["flags"]}
+        dismissals = [d for d in dismissals if d["segment_id"] in known]
+        uncovered = signing.uncovered_risk(risk, note, dismissals)
+        if uncovered:
+            where = "、".join(f"#{u['segment_id']}" for u in uncovered)
+            raise Refused(f"{len(uncovered)} high-level risk cue(s) are not in the note and not left out with a reason",
+                          f"逐字稿 {where} 的風險線索還沒有寫進紀錄。請補寫並引用該段，或在風險面板按「不納入紀錄」並填寫理由。",
+                          risk_uncovered=uncovered)
+        kept = sum(1 for s in note.sentences() if s.status != "supported" and s.confirmed_by_therapist)
+        signed = signing.signed_form(note, dismissals)
+        signature = store.sign_note(
+            sid, signed, signed_by.strip(), kept,
+            transcript_sha256=signing.transcript_sha256(sid), note_sha256=signing.note_sha256(signed), verifier_version=VERIFIER_VERSION,
+            audit_rows=[("risk_cue_left_out", f"{sid} #{d['segment_id']}: {d['reason']}") for d in dismissals],
+        )
+        return self._json(signature)
+
+    def _addendum(self, sid):
+        payload = self._payload()
+        text, author = payload.get("text"), payload.get("author")
+        if not isinstance(text, str) or not text.strip() or len(text) > 4000 or not isinstance(author, str) or not author.strip() or len(author) > 80:
+            return self._error(HTTPStatus.BAD_REQUEST, "text and author are required", "請填寫補充說明的內容和姓名。")
+        load_transcript(sid)
+        try:
+            return self._json({"addenda": store.add_addendum(sid, text.strip(), author.strip())})
+        except store.NotSignedError:
+            raise Refused("an addendum can only be added to a signed note", "這次會談還沒有簽核，草稿可以直接修改，不需要補充說明。") from None
 
     def _upload(self, query):
         client_id = query.get("client", [""])[0]
-        session_id = _session_id(query.get("session_id", [""])[0])
+        session_id = _session_id(query.get("session_id", [""])[0])  # upper case
         if query.get("consent", [""])[0] != "1":
             return self._error(HTTPStatus.BAD_REQUEST, "the client's written consent to recording is required")
         if (config.SESSIONS_DIR / f"{session_id}.json").exists():

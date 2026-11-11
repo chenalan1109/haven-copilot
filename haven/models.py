@@ -41,8 +41,13 @@ class NoteSentence:
     # "transcript": evidence is segment ids. "measure": the sentence is filled
     # in from questionnaire scores, so there is no transcript line to cite.
     source: str = "transcript"
-    # A weak risk sentence: signing waits until the therapist confirms it.
+    # A weak sentence that is about risk, or that the local model rejected:
+    # signing waits until the therapist confirms it.
     must_confirm: bool = False
+    # The local model was asked and said the cited lines do not support the sentence.
+    model_rejected: bool = False
+    # The therapist read a flagged sentence against the transcript and kept it as written.
+    confirmed_by_therapist: bool = False
 
 
 @dataclass
