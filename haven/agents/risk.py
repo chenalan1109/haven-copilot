@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 
 from ..models import RiskFlag, RiskReport, Transcript
+from ..textutil import polarity
 
 LEVEL_ORDER = {"none": 0, "info": 1, "review": 2, "high": 3, "critical": 4}
 
@@ -43,12 +44,15 @@ CHECKLIST: list[tuple[str, list[str], list[str]]] = [
     ("安全計畫", ["安全計畫"], []),
     ("危機資源或轉介", ["一九二五", "1925", "安心專線", "急診", "身心科", "精神科"], []),
 ]
-_NEGATION = re.compile(r"(沒有|沒|不會|不是|從來沒)[^，。]{0,4}$")
-
-
 def _negated(text: str, cue: str) -> bool:
-    i = text.find(cue)
-    return bool(_NEGATION.search(text[max(0, i - 8) : i]))
+    """A denied cue ("沒有想死") is kept at review level. A double negation
+    ("沒有一天不想死", "不是不想死") affirms the cue and is not lowered."""
+    return polarity(text, text.find(cue)) == "denied"
+
+
+def plain_cues() -> list[str]:
+    """Every cue word, for the verifier's negation check."""
+    return [cue for _, cues in LEXICON.values() for cue in cues]
 
 
 def checklist(t: Transcript) -> list[dict]:

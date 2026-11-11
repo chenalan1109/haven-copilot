@@ -235,8 +235,9 @@ class Handler(BaseHTTPRequestHandler):
         payload = self._payload()
         result, transcript, measures = _draft(sid)
         note, verification, _ = signing.check(sid, transcript, payload, result["note"]["template"], result["note"].get("engine", ""), measures, ORCH.verifier)
-        signing.remember(sid, note)
-        store.audit("verify", f"{sid} {verification['supported']}/{verification['total']} supported")
+        signing.remember(sid, note, verification.get("llm_failed", False))
+        store.audit("verify", f"{sid} {verification['supported']}/{verification['total']} supported"
+                    + ("; local model did not answer" if verification.get("llm_failed") else ""))
         return self._json({"note": to_dict(note), "verification": verification,
                            "risk_uncovered": signing.uncovered_risk(result["risk"], note)})
 

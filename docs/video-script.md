@@ -53,7 +53,7 @@ Here's the prototype. Before her fourth session, Haven shows that 小安 isn't i
 3. Slowly move down the checklist. Stop on the two orange items: 工具或手段可及性 and 過去自殺或自傷史.
 
 **VO:**
-After the session, the risk agent flags that line with the exact quote. "No plan" is kept for review, not treated as all-clear. Then it checks the inquiry itself. Ideation, frequency, a safety plan and the 1925 hotline were covered. Access to means and past attempts were not, so Haven suggests asking.
+After the session, the risk agent flags that line with the exact quote. "No plan" is kept for review, not treated as all-clear. Then it checks the inquiry itself. Ideation and frequency were asked about, a safety plan was proposed and the 1925 hotline was given. Access to means and past attempts were not, so Haven suggests asking.
 
 ## 1:58–2:22 · Demo: verifier — same screen, note panel
 

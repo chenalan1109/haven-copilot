@@ -55,6 +55,9 @@ class Note:
     template: str
     sections: dict[str, list[NoteSentence]]
     engine: str
+    # Things the therapist must know about how the draft was made, such as the
+    # local model not answering and the rule engine writing it instead.
+    warnings: list[str] = field(default_factory=list)
 
     def sentences(self) -> list[NoteSentence]:
         return [s for items in self.sections.values() for s in items]

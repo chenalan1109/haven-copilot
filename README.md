@@ -32,8 +32,8 @@ flowchart LR
 | Agent | What it does | Where |
 | --- | --- | --- |
 | ASR | Speech to timestamped segments (faster-whisper, int8) | `haven/transcript.py` |
-| Note writer | Drafts SOAP or DAP notes; every sentence cites segment ids | `haven/agents/writer.py` |
-| Verifier | Checks each sentence against the segments it cites, in three layers: hard rules (numbers, time words and gendered pronouns must appear in the cited lines; a risk sentence must keep the cited lines' negation), word overlap, then one batched local-LLM check for paraphrases. Signing is blocked until the therapist edits, deletes or confirms every unsupported sentence, every weak sentence about risk, and every weak sentence the local model was asked about and rejected | `haven/agents/verifier.py` |
+| Note writer | Drafts SOAP or DAP notes; every sentence cites segment ids. Both templates end with a risk section, R (風險與安全), with no sentence limit: a transcript line with a high-level risk cue that no sentence cites is added there as a quote, whichever engine wrote the note. The objective section is for the clinician's observations of behaviour and affect in the session, still cited; what a transcript cannot show (appearance, affect, orientation) the therapist adds. Sessions over 60 segments are written in parts of 60 and joined | `haven/agents/writer.py` |
+| Verifier | Checks each sentence against the segments it cites, in three layers: hard rules (numbers, time words and gendered pronouns must appear in the cited lines; a risk or behaviour word such as 想死, 割腕, 安眠藥 or 打 must be denied or stated as in the cited lines, with a double negation such as 「沒有一天不想死」 read as stated; a client's hedged self-criticism must not be written as fact), word overlap for the sentence and for each clause (a clause with no counterpart in the cited lines holds the sentence), then one batched local-LLM check for paraphrases. Signing is blocked until the therapist edits, deletes or confirms every unsupported sentence, every weak sentence about risk (suicide, self-harm, harm to others, abuse or substance wording, or a sentence citing a line with a risk cue), and every weak sentence the local model was asked about and rejected. If the model does not answer, the sentence says so (「本機模型未回應」) instead of reporting a model judgement | `haven/agents/verifier.py` |
 | Risk | Flags suicide, self-harm, violence and functioning cues with the exact quote; keeps negated cues for review; when suicide cues appear, shows which parts of a risk inquiry the session covered (ideation, frequency, plan, intent, access to means, past attempts, protective factors, safety plan, crisis resources) and which to consider asking or documenting | `haven/agents/risk.py` |
 | Outcome | Routine outcome monitoring: reliable change (PHQ-9: 6, GAD-7: 4), clinically significant change, not-on-track heuristic with a review prompt, PHQ-9 item 9 and BSRS-5 suicide-item alerts; writes the score lines into the note's objective section | `haven/agents/outcome.py` |
 | Case memory | Answers "which sessions mentioned her father?" from that client's own sessions only | `haven/agents/memory.py` |
@@ -59,7 +59,9 @@ Requires Python 3.10+. The core has no third-party dependencies.
 python3 -m haven
 ```
 
-Open http://127.0.0.1:8765. Without a local model, Haven uses its **rule-based demo engine**, which selects and rewrites what was said. It cannot invent content, but the notes read like quotes.
+Open http://127.0.0.1:8765. Without a local model, Haven uses its **rule-based demo engine**, which selects what was said and changes only the speaker (「我」 to 「個案」), so the notes read like quotes. A proposal such as 「我們來擬安全計畫，好嗎？」 is written as 「心理師提議…（個案回應：…）」, not as a finished plan.
+
+If a local model is configured but does not answer, the same rule engine writes the draft and the result says so: the engine label reads 「規則引擎（本機模型未回應）」, the session page shows a red banner, and the audit log records it.
 
 ### With a local LLM (recommended for the demo)
 
@@ -137,7 +139,7 @@ Notes vary from run to run, so `--repeat 3` runs each session three times and re
 python3 scripts/verifier_eval.py
 ```
 
-Runs the verifier on 48 note sentences about the simulated sessions: 18 correct ones and 30 with a known error (wrong number, time word, pronoun or speaker, reversed risk statement, invented content, overstated frequency, unmade diagnosis, wrong citation). Reports how many wrong sentences block signing and how many correct ones are flagged by mistake, per error type, in [docs/verifier-eval](docs/verifier-eval). On a laptop with qwen2.5:7b: 27/30 wrong sentences blocked, 1/18 correct ones held for confirmation. Since the Stage II review, a risk sentence that only the model supports also blocks signing until the therapist confirms it: one more wrong sentence is caught, and one correct risk sentence (V22) now needs a click. The cases were written by the team, so treat these numbers as a regression check, not an independent accuracy figure.
+Runs the verifier on 48 note sentences about the simulated sessions: 18 correct ones and 30 with a known error (wrong number, time word, pronoun or speaker, reversed risk statement, invented content, overstated frequency, unmade diagnosis, wrong citation). Reports how many wrong sentences block signing and how many correct ones are flagged by mistake, per error type, in [docs/verifier-eval](docs/verifier-eval). On a laptop with qwen2.5:7b: 27/30 wrong sentences blocked, 1/18 correct ones held for confirmation. Since the Stage II review, a risk sentence that only the model supports also blocks signing until the therapist confirms it: one more wrong sentence is caught, and one correct risk sentence (V22) now needs a click. After the 2026-11-12 review fixes, the rule layers alone block 28/30 wrong sentences and 2/18 correct ones ([rules-only](docs/verifier-eval/rules-only.md)); the figures with a model in this README were measured before those fixes and have not been re-run. The cases were written by the team, so treat these numbers as a regression check, not an independent accuracy figure.
 
 ### Transcribing real audio
 
@@ -217,11 +219,12 @@ Targets to validate on the B70. These are goals, not measured results yet:
 ## Limitations
 
 - The rule-based engine and the risk lexicon are for the prototype. Lexicon matching misses indirect expressions; the Stage II LLM pass and psychologist-labelled test data address this.
-- The verifier's bigram overlap is a first filter. Paraphrased sentences are sent to the local LLM for a second check when one is running.
+- The verifier's bigram overlap is a first filter. Paraphrased sentences are sent to the local LLM for a second check when one is running. Without a model, a sentence with an unmatched clause is marked weak but does not block signing unless it is about risk.
+- Writing long sessions in parts of 60 segments has been tested with a stand-in model only, not yet on the B70; each part is written without seeing the others.
 - The not-on-track rule is a simple heuristic, not a validated expected-recovery curve.
 - Uploaded audio has no acoustic speaker diarization yet. Speakers are guessed by the LLM from the words; the therapist cannot yet correct a label in the UI, so lines from guessed speakers are flagged more and counted less (see "Transcribing real audio").
 - There is no login yet: the server only listens on the machine itself. A LAN deployment in Stage II needs therapist accounts, per-therapist access to clients and TLS.
-- The negation rule for risk sentences is deliberately strict and flags some correct sentences; the therapist confirms them.
+- The negation rule compares the same word in the sentence and in the cited lines, clause by clause. It does not read a denial placed after the word (「自殺意念：無」), and for a risk sentence in other words than the source's it falls back to a coarse check that flags some correct sentences; the therapist confirms them.
 - The checklist detects whether a topic came up by keywords. It cannot judge the quality of the inquiry.
 
 ## Team

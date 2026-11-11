@@ -5,7 +5,12 @@ Three layers, cheapest first:
    time word and gendered pronoun in it must also appear in those segments.
    "個案表示…" must cite at least one of the client's own lines.
    Small models get exactly these details wrong ("下週五" for "這週五").
-2. Lexical overlap between the sentence and its evidence.
+   A risk or behaviour word (想死, 割腕, 安眠藥, 打…) must be denied or stated
+   the same way as in the cited lines; "沒有一天不想死" counts as stated.
+   A client's hedged self-criticism must not be written as a fact.
+2. Lexical overlap between the sentence and its evidence, for the whole
+   sentence and for each clause: a clause with no counterpart in the cited
+   lines ("…，已經想放棄工作") holds the sentence even when the rest matches.
 3. For paraphrases that pass the rules but overlap little, one batched call
    to the local LLM.
 Unsupported sentences block signing until the therapist edits, deletes or
@@ -22,13 +27,14 @@ from __future__ import annotations
 import re
 
 from ..models import Note, Transcript
-from ..textutil import overlap
+from ..textutil import bigrams, clauses, denied, has_negation, overlap
+from . import risk as risk_agent
 
 SUPPORTED = 0.5
 WEAK = 0.25
 # Stored with every signed note and with the cached verdicts. Change it whenever
 # a rule changes, so a verdict from older rules is never reused.
-VERIFIER_VERSION = "2026.11-1"
+VERIFIER_VERSION = "2026.11-2"
 MEASURE_MISMATCH = "量表句與系統依量表資料產生的內容不符。量表句不可修改：請還原，或改寫成引用逐字稿的句子"
 
 _TIME = re.compile(r"這週|下週|上週|本週|今天|明天|昨天|下次|上次|每天|每週|週[一二三四五六日]")
@@ -40,13 +46,32 @@ _SAME_TIME = {"本週": "這週", "這一週": "這週", "這個禮拜": "這週
 _CLIENT_SAID = re.compile(r"^個案(?:表示|自述|提到|說)")
 # The mirror case, seen from Qwen3-32B on a 36-minute session: "心理師認為…" written
 # over lines only the client spoke, so an assessment nobody voiced reads as the therapist's.
-_THERAPIST_SAID = re.compile(r"^心理師(?:觀察到|注意到|認為|評估|判斷|建議|指出|表示|說明|提到|提醒|鼓勵|肯定)")
+_THERAPIST_SAID = re.compile(r"^心理師(?:觀察到|注意到|認為|評估|判斷|建議|提議|指出|表示|說明|提到|提醒|鼓勵|肯定)")
 # Risk statements where a dropped or added negation reverses the meaning
 # ("沒有具體計畫" vs. "有具體計畫"). These are the sentences that matter most.
 # 計畫 and 工具 count only in their risk sense, so "讀書計畫" is not a risk sentence.
-_RISK_TERM = re.compile(r"自殺|結束生命|結束自己的生命|想死|自傷|傷害自己|輕生"
-                        r"|具體(?:的)?計畫|安全計畫|(?:計畫|工具|方法)(?:去|要)?(?:傷害|結束|自殺)")
-_NEGATION = re.compile(r"沒有|沒|不|未|否認|無")
+_CORE_RISK = (r"自殺|結束(?:自己的)?生命|想死|不想活|自傷|自殘|傷害自己|輕生"
+              r"|具體(?:的)?計畫|安全計畫|(?:計畫|工具|方法)(?:去|要)?(?:傷害|結束|自殺)")
+_CORE_RISK_TERM = re.compile(_CORE_RISK)
+# Wider: a weak sentence with any of these waits for the therapist, and the
+# local model's yes alone does not clear it. Covers self-harm methods, harm to
+# others, abuse and substance use, not only suicide wording.
+_RISK_TERM = re.compile(
+    _CORE_RISK
+    + r"|傷害(?:他人|別人)|割(?:腕|手)|燒炭|上吊|跳樓|吞藥|過量|安眠藥|存藥|想消失|消失算了|消失就好|活著(?:好累|沒意|沒有意)|解脫|遺書|遺囑"
+    r"|殺|砍|暴力|家暴|被打|打(?:我|他|她|人|小孩|孩子)|動手|虐|性侵|強暴|強迫發生|通報"
+    r"|喝酒|飲酒|酗酒|吸毒|毒品|安非他命|K他命|大麻"
+)
+# Words whose denial is compared between the sentence and the cited lines:
+# every cue the risk agent knows, plus a few behaviour words.
+_POLAR_EXTRA = ["想過", "怎麼做", "割腕", "割手", "存藥", "安眠藥", "燒炭", "傷害", "打", "喝酒", "吃藥", "念頭", "計畫"]
+_POLAR_TERM = re.compile("|".join(sorted({re.escape(w) for w in risk_agent.plain_cues() + _POLAR_EXTRA}, key=len, reverse=True)))
+# A client's "我好像什麼都做不好" written as "個案確實什麼都做不好".
+_AS_FACT = re.compile(r"確實|的確|就是|真的是|其實是|顯然")
+_SELF_CRITICISM = re.compile(r"沒用|做不好|失敗|很糟|很爛|沒價值|廢物|不夠好|很差")
+_HEDGE = re.compile(r"覺得|好像|可能|是不是|也許|感覺")
+_REPORTED = re.compile(r"個案(?:表示|自述|提到|說|覺得|認為|感到|擔心)")
+MODEL_SILENT = "本機模型未回應，這句沒有經過模型檢查，請人工對照原句確認"
 
 SYSTEM_PROMPT = "你是嚴謹的事實查核員。判斷「紀錄句子」是否能由「逐字稿」直接支持。只輸出 JSON。"
 
@@ -64,8 +89,33 @@ def rule_violation(sentence: str, source: str) -> str:
     for token in set(_PRONOUN.findall(sentence)):
         if token not in source:
             return f"代名詞「{token}」不在引用的逐字稿中，請確認指的是誰"
-    if _RISK_TERM.search(sentence) and bool(_NEGATION.search(sentence)) != bool(_NEGATION.search(source)):
+    aligned = set()
+    for m in _POLAR_TERM.finditer(sentence):
+        term = m.group()
+        spots = [x.start() for x in re.finditer(re.escape(term), source)]
+        if not spots:
+            continue
+        aligned.add(term)
+        said_no = denied(sentence, m.start(), broad=True)
+        # The source may use the word more than once (a question, then the answer);
+        # the sentence must agree with at least one use.
+        if all(denied(source, i, broad=True) != said_no for i in spots):
+            return f"「{term}」的否定語與逐字稿不一致，請確認語意沒有被反轉"
+    # A risk statement in other words than the source's: compare whether each side denies anything.
+    loose = [m.group() for m in _CORE_RISK_TERM.finditer(sentence) if not any(a in m.group() or m.group() in a for a in aligned)]
+    if loose and has_negation(sentence) != has_negation(source):
         return "風險相關句的否定語與逐字稿不一致，請確認語意沒有被反轉"
+    if _AS_FACT.search(sentence) and _SELF_CRITICISM.search(sentence) and not _REPORTED.search(sentence) and _HEDGE.search(source):
+        return "個案的主觀感受被寫成事實，請改為「個案表示覺得…」"
+    return ""
+
+
+def unbacked_clause(sentence: str, source: str) -> str:
+    """The first clause of the sentence that shares nothing with the cited lines, or ''."""
+    for clause in clauses(sentence):
+        grams = bigrams(clause)
+        if len(grams) >= 3 and not grams & bigrams(source):
+            return clause.strip()
     return ""
 
 
@@ -73,17 +123,30 @@ class Verifier:
     def __init__(self, llm=None):
         self.llm = llm
 
-    def _llm_verdicts(self, pending: list[tuple[int, str, str]]) -> dict[int, bool]:
-        """One call for all paraphrased sentences; returns the model's yes or no per index."""
+    def _llm_verdicts(self, pending: list[tuple[int, str, str]]) -> dict[int, bool] | None:
+        """One call for all held sentences; the model's yes or no per index.
+        None when the model did not give a usable answer at all."""
         items = "\n\n".join(f"<{i}>\n逐字稿：{source}\n紀錄句子：{claim}" for i, claim, source in pending)
-        raw = self.llm.generate_json(
-            SYSTEM_PROMPT,
-            f"{items}\n\n逐題判斷紀錄句子的每個事實是否都出現在對應逐字稿中。"
-            '輸出 {"results": [{"id": 編號, "supported": true 或 false}]}',
-        )
-        results = raw.get("results", []) if isinstance(raw, dict) else []
-        return {int(r["id"]): r["supported"] for r in results
-                if isinstance(r, dict) and isinstance(r.get("supported"), bool) and str(r.get("id")).isdigit()}
+        try:
+            raw = self.llm.generate_json(
+                SYSTEM_PROMPT,
+                f"{items}\n\n逐題判斷紀錄句子的每個事實是否都出現在對應逐字稿中。"
+                '輸出 {"results": [{"id": 編號, "supported": true 或 false}]}',
+            )
+        except Exception:  # a model fault must not take the whole session down
+            return None
+        results = raw.get("results") if isinstance(raw, dict) else None
+        if not isinstance(results, list):
+            return None
+        out = {}
+        for r in results:
+            if not isinstance(r, dict) or not isinstance(r.get("supported"), bool):
+                continue
+            try:
+                out[int(r["id"])] = r["supported"]
+            except (KeyError, TypeError, ValueError):
+                continue
+        return out
 
     def run(self, note: Note, t: Transcript, measures=()) -> dict:
         """``measures`` are the score lines the server built for this session. A
@@ -91,6 +154,15 @@ class Verifier:
         ordinary, unsupported claim."""
         segs = t.by_id()
         measures = set(measures)
+        # Segments carrying a risk cue (anything but a functioning cue): a weak
+        # sentence citing one waits for the therapist whatever words it uses.
+        risky = {f.segment_id for f in risk_agent.RiskAgent().run(t).flags if f.category != "嚴重失功能"}
+        warnings: list[str] = []
+        llm_failed = False
+
+        def about_risk(s) -> bool:
+            return bool(_RISK_TERM.search(s.text)) or any(e in risky for e in s.evidence)
+
         pending: list[tuple[int, str, str]] = []
         sentences = note.sentences()
         for i, s in enumerate(sentences):
@@ -120,6 +192,11 @@ class Verifier:
             violation = rule_violation(s.text, source)
             if violation:
                 s.status, s.reason = "unsupported", violation
+            elif s.support >= SUPPORTED and unbacked_clause(s.text, source):
+                # Most of the sentence matches, but one clause has no counterpart.
+                s.status = "weak"
+                s.reason = f"句中「{unbacked_clause(s.text, source)}」在引用段落中找不到對應內容，請確認"
+                pending.append((i, s.text, source))
             elif s.support >= SUPPORTED:
                 s.status, s.reason = "supported", ""
             else:
@@ -129,28 +206,34 @@ class Verifier:
         # Paraphrases score low on overlap; let the local model rule on them.
         if pending and self.llm is not None:
             verdicts = self._llm_verdicts(pending)
-            accepted = {i for i, ok in verdicts.items() if ok}
+            if verdicts is None:
+                llm_failed = True
+                warnings.append("驗證 agent：本機模型未回應，改述的句子沒有經過模型檢查")
+                verdicts = {}
             for i, text, _ in pending:
+                s = sentences[i]
                 # An explicit no from the model holds the sentence for the therapist,
                 # the same as a weak risk sentence.
-                sentences[i].model_rejected = verdicts.get(i) is False
-                if i in accepted and _RISK_TERM.search(text):
+                s.model_rejected = verdicts.get(i) is False
+                if verdicts.get(i) is True and about_risk(s):
                     # A 7B model accepted "否認自殺意念" for a line that never said it.
                     # On risk sentences the model's yes is not enough on its own.
-                    sentences[i].status, sentences[i].reason = "weak", "風險相關句只有本機模型判斷支持，請心理師對照原句確認"
-                elif i in accepted:
-                    sentences[i].status, sentences[i].reason = "supported", ""
+                    s.status, s.reason = "weak", "風險相關句只有本機模型判斷支持，請心理師對照原句確認"
+                elif verdicts.get(i) is True:
+                    s.status, s.reason = "supported", ""
+                elif s.model_rejected:
+                    s.reason = "本機模型判斷引用段落不足以支持此句"
                 else:
-                    sentences[i].reason = "本機模型判斷引用段落不足以支持此句"
+                    s.reason = MODEL_SILENT  # no answer is not a "no"
         for s in sentences:
             if s.source == "measure":
                 continue
             # Uploaded audio: who said a line is the model's guess, so a sentence
             # about what the client said, or about risk, waits for the therapist.
             guessed = any(segs[e].speaker_source != "script" for e in s.evidence if e in segs)
-            if guessed and s.status == "supported" and (_CLIENT_SAID.search(s.text) or _THERAPIST_SAID.search(s.text) or _RISK_TERM.search(s.text)):
+            if guessed and s.status == "supported" and (_CLIENT_SAID.search(s.text) or _THERAPIST_SAID.search(s.text) or about_risk(s)):
                 s.status, s.reason = "weak", "引用段落的說話者由本機模型推測，請確認是誰說的"
-            s.must_confirm = s.status == "weak" and (bool(_RISK_TERM.search(s.text)) or s.model_rejected)
+            s.must_confirm = s.status == "weak" and (about_risk(s) or s.model_rejected)
         # Score lines are not claims about the session; leave them out of the ratio.
         claims = [s for s in sentences if s.source != "measure"]
         n = len(claims)
@@ -164,4 +247,6 @@ class Verifier:
             # The server adds the therapist's confirmations and the risk-coverage gate (haven/signing.py).
             "ready_to_sign": n > 0 and counts["unsupported"] == 0 and not any(s.must_confirm for s in claims),
             "verifier_version": VERIFIER_VERSION,
+            "llm_failed": llm_failed,
+            "warnings": warnings,
         }

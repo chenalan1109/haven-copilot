@@ -1,14 +1,14 @@
 {
   "label": "rules-only",
-  "date": "2026-11-08T01:51:40+08:00",
+  "date": "2026-11-12T00:48:44+08:00",
   "engine": "rules + overlap (no LLM)",
   "summary": {
     "errors": 30,
-    "errors_blocked": 27,
-    "errors_flagged": 29,
+    "errors_blocked": 28,
+    "errors_flagged": 30,
     "correct": 18,
     "correct_blocked": 2,
-    "correct_flagged": 12,
+    "correct_flagged": 13,
     "per_label": {
       "citation": {
         "n": 1,
@@ -32,8 +32,8 @@
       },
       "hedge": {
         "n": 1,
-        "blocked": 0,
-        "flagged": 0
+        "blocked": 1,
+        "flagged": 1
       },
       "intensity": {
         "n": 2,
@@ -300,10 +300,10 @@
       ],
       "text": "個案確實什麼都做不好。",
       "label": "hedge",
-      "status": "supported",
+      "status": "unsupported",
       "support": 0.71,
-      "reason": "",
-      "blocks": false
+      "reason": "個案的主觀感受被寫成事實，請改為「個案表示覺得…」",
+      "blocks": true
     },
     {
       "id": "V19",
@@ -339,9 +339,9 @@
       ],
       "text": "個案近兩週幾乎睡不著，瘦了三公斤，食不知味。",
       "label": "ok",
-      "status": "supported",
+      "status": "weak",
       "support": 0.56,
-      "reason": "",
+      "reason": "句中「食不知味」在引用段落中找不到對應內容，請確認",
       "blocks": false
     },
     {

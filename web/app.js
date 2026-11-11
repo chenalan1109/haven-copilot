@@ -3,7 +3,12 @@
 // Haven therapist UI. Talks only to the local Haven server (same origin).
 
 const SECTION_NAMES = {
-  S: "S 主觀資料", O: "O 客觀資料", A: "A 評估", P: "P 計畫", D: "D 資料",
+  S: "S 主觀資料", O: "O 客觀資料", A: "A 評估", P: "P 計畫", D: "D 資料", R: "R 風險與安全",
+};
+// Shown under a section title: what the draft cannot contain and the therapist adds.
+const SECTION_HINTS = {
+  O: "量表分數由系統填入。精神狀態觀察（外觀、情感、思考、定向、風險行為）逐字稿看不出來，請心理師自行補寫。",
+  R: "逐字稿中的風險線索、保護因子與安全措施；不受句數限制。提議而未完成的安全計畫會寫成「心理師提議」。",
 };
 // Describes the cues found in the transcript, not the client's risk level.
 const RISK_NAMES = { none: "未偵測到風險線索", review: "有需留意的線索", high: "有自殺或自傷等高關注線索", critical: "提及計畫或工具" };
@@ -313,6 +318,7 @@ function renderNote(container, note, verification) {
   container.replaceChildren(
     ...Object.entries(note.sections).map(([key, items]) => el("div", { class: "note-section", "data-key": key },
       el("h4", {}, SECTION_NAMES[key] || key),
+      SECTION_HINTS[key] && !currentSession.signed ? el("div", { class: "section-hint" }, SECTION_HINTS[key]) : null,
       items.length ? items.map(sentenceRow)
         : currentSession.signed ? el("div", { class: "sentence empty-section" }, "（無）")
         : el("div", { class: "sentence", "data-evidence": "[]", "data-orig": "" }, el("span", { class: "txt", contenteditable: "true" }, "")),
@@ -408,7 +414,10 @@ function renderSession(r, focusSeg) {
     ),
   );
 
-  main.replaceChildren(head, el("div", { class: "workspace" }, transcript, notePanel));
+  // How the draft was made, when it matters: the model did not answer and the rule engine wrote it.
+  const warnings = (r.warnings || []).length && !locked
+    ? el("div", { class: "warnings", role: "alert" }, r.warnings.map((w) => el("div", {}, w))) : null;
+  main.replaceChildren(head, warnings || "", el("div", { class: "workspace" }, transcript, notePanel));
   renderRiskGate();
   renderNote(noteBox, r.note, r.verification);
   if (focusSeg) highlight([focusSeg]);

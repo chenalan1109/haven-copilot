@@ -14,9 +14,10 @@ import json
 
 from . import config, store
 from .agents.verifier import VERIFIER_VERSION, Verifier
+from .agents.writer import TEMPLATES
 from .models import Note, NoteSentence, Transcript, to_dict
 
-SECTION_KEYS = {"SOAP": ("S", "O", "A", "P"), "DAP": ("D", "A", "P")}
+SECTION_KEYS = {name: tuple(sections) for name, sections in TEMPLATES.items()}
 GATED_LEVELS = ("high", "critical")
 MAX_TEXT = 2000
 

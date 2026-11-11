@@ -79,7 +79,9 @@ class Orchestrator:
             "session_no": transcript.session_no,
             "date": transcript.date,
             "simulated": transcript.simulated,
-            "engine": self.engine,
+            # What actually wrote this draft: the model's name, or the rule engine when the model did not answer.
+            "engine": note.engine,
+            "warnings": note.warnings + verification.get("warnings", []),
             "transcript": [to_dict(s) for s in transcript.segments],
             "note": to_dict(note),
             "verification": verification,
@@ -90,8 +92,9 @@ class Orchestrator:
             "timings_ms": timings,
         }
         store.save_result(session_id, result)
-        signing.remember(session_id, note)
-        store.audit("process_session", f"{session_id} engine={self.engine}")
+        signing.remember(session_id, note, verification.get("llm_failed", False))
+        store.audit("process_session", f"{session_id} engine={note.engine}" + (f" configured={self.engine}" if note.engine != self.engine else "")
+                    + ("; verifier: local model did not answer" if verification.get("llm_failed") else ""))
         return result
 
     def refresh(self, result: dict) -> dict:
@@ -106,13 +109,14 @@ class Orchestrator:
             k: [NoteSentence(s["text"], list(s.get("evidence", [])), source="measure" if s["text"] in measures and not s.get("evidence") else "transcript")
                 for s in items]
             for k, items in stored["sections"].items()
-        }, stored.get("engine", ""))
+        }, stored.get("engine", ""), stored.get("warnings", []))
         result["verification"] = self.verifier.run(note, transcript, measures)
         result["note"] = to_dict(note)
         result["risk"] = to_dict(self.risk.run(transcript))
         result["risk_uncovered"] = signing.uncovered_risk(result["risk"], note)
+        result["warnings"] = stored.get("warnings", []) + result["verification"].get("warnings", [])
         store.save_result(session_id, result)
-        signing.remember(session_id, note)
+        signing.remember(session_id, note, result["verification"].get("llm_failed", False))
         store.audit("reverify_stored_draft", f"{session_id} verifier={VERIFIER_VERSION}")
         return result
 
