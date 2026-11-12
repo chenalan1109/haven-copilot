@@ -98,7 +98,12 @@ def _faster_whisper(audio_path: Path) -> list[tuple[float, float, str]]:
 
 def _openai_server(audio_path: Path) -> list[tuple[float, float, str]]:
     """Sends the audio to a local server with the OpenAI transcription API (vLLM serving
-    Whisper on the B70). The same local-only rule as the note model applies."""
+    Whisper on the B70). The same local-only rule as the note model applies.
+
+    The whole file is read into memory to build the multipart body (the upload
+    itself is streamed to disk by the server, but this request is not streamed).
+    A 200 MB recording therefore needs roughly twice that in memory while it is
+    sent; four rooms uploading at once on a small machine would feel it."""
     from .llm import _OPENER, assert_local
 
     assert_local(config.ASR_URL)

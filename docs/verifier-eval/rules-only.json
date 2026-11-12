@@ -1,6 +1,6 @@
 {
   "label": "rules-only",
-  "date": "2026-11-12T00:48:44+08:00",
+  "date": "2026-11-12T14:51:33+08:00",
   "engine": "rules + overlap (no LLM)",
   "summary": {
     "errors": 30,

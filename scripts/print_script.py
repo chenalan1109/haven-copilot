@@ -1,4 +1,6 @@
-"""Prints a simulated session as a two-person script for actors to record.
+"""Prints a simulated session as a two-person script, to be read aloud for a speech-to-text test.
+
+So far only C001-S04 lines #10-#12 have been recorded this way (docs/asr-eval).
 
     python3 scripts/print_script.py C001-S04
 """

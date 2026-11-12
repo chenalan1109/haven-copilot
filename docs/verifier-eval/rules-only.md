@@ -1,7 +1,7 @@
 # Verifier test set: rules-only
 
 - Engine: `rules + overlap (no LLM)`
-- Date: 2026-11-12T00:48:44+08:00
+- Date: 2026-11-12T14:51:33+08:00
 - Cases: 48 sentences about the simulated sessions (18 correct, 30 with a known error)
 - Blocked = marked unsupported, or weak on a risk sentence, so the note cannot be signed until the therapist acts. Flagged = blocked or marked weak.
 

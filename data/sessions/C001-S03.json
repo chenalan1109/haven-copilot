@@ -4,7 +4,7 @@
   "session_no": 3,
   "date": "2026-10-06",
   "simulated": true,
-  "note": "模擬會談，由演員依腳本演出，非真實個案。",
+  "note": "模擬會談，內容為團隊撰寫的腳本，非真實個案，也不是錄音。",
   "segments": [
     {"id": 1, "start": 0.0, "end": 7.5, "speaker": "therapist", "text": "上次我們談到你在公司的壓力，這一週過得怎麼樣？"},
     {"id": 2, "start": 7.5, "end": 21.0, "speaker": "client", "text": "還是很累，主管又把一個新專案丟給我，我每天都加班到九點多才回家。"},

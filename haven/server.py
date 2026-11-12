@@ -495,7 +495,9 @@ class Handler(BaseHTTPRequestHandler):
         fd, tmp_name = tempfile.mkstemp(suffix=suffix, prefix="upload-", dir=files.temp_dir())
         try:
             with os.fdopen(fd, "wb") as tmp:
-                # Streamed to the temp file in 1 MB pieces, so the upload itself is not held in memory.
+                # Streamed to the temp file in 1 MB pieces, so the upload is not held in memory
+                # here. (The faster-whisper backend reads the file from disk; the "openai"
+                # backend then loads it whole to send it on: see transcript._openai_server.)
                 left = length
                 while left > 0:
                     chunk = self.rfile.read(min(left, 1 << 20))
@@ -575,6 +577,15 @@ def _reserve_upload(session_id: str, client_id: str) -> int:
         return session_no
 
 
+def lan_warning(host: str) -> str:
+    """Haven has no login. On anything but loopback, whoever can reach the port
+    can read every transcript and sign notes."""
+    if host in ("127.0.0.1", "localhost", "::1"):
+        return ""
+    return (f"Haven: WARNING: HAVEN_HOST={host} is not loopback. There is no login: anyone who can reach this port can read "
+            "every transcript and sign notes. LAN use is not supported yet; set HAVEN_HOST=127.0.0.1.")
+
+
 def serve() -> None:
     global ORCH
     os.umask(0o077)  # whatever Haven creates is for this account only
@@ -586,6 +597,9 @@ def serve() -> None:
     if not chain["ok"]:
         print(f"Haven: WARNING: the audit log does not verify (first bad row id {chain['first_bad_id']}). "
               "A row was changed, inserted or removed outside Haven. Run scripts/verify_audit.py.", file=sys.stderr)
+    warning = lan_warning(config.HOST)
+    if warning:
+        print(warning, file=sys.stderr)
     ORCH = Orchestrator()
     httpd = ThreadingHTTPServer((config.HOST, config.PORT), Handler)
     print(f"Haven running at http://{config.HOST}:{config.PORT}  (engine: {ORCH.engine})")

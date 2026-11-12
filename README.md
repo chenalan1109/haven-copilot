@@ -2,42 +2,93 @@
 
 **ASUS UGen AI League Hackathon · Workplace AI · Battlefield Thunderstorm (ASUS UGen Intel Arc Pro B70 32GB)**
 
-Haven turns a therapy session into a draft progress note, risk cues and outcome-tracking alerts. Everything runs on one machine inside the clinic. Session audio and transcripts never leave the room, so therapists get AI documentation help without sending their clients' most sensitive data to a cloud service.
+Haven turns a therapy session into a draft progress note, risk cues and outcome-tracking reminders. By default everything runs on one machine in the clinic: Haven's own code sends session content only to a model server on the same machine (or, if configured, to a named server on the clinic's private network), and it calls no cloud service. Therapists get AI documentation help without handing their clients' most sensitive data to a third-party processor.
 
-> All data in this repository is from **simulated sessions** performed by actors from a script. It contains no real client information.
+What this does and does not claim is spelled out under "Privacy and safety guards in the code" and "Limitations". In short: the address check covers Haven's own requests, not what a model server does afterwards; a network capture during a session has not been done yet; and data on disk is not encrypted yet.
+
+> All data in this repository is **scripted, simulated sessions** written by the team. No real client information. The transcripts are scripts, not recordings: only a 23-second excerpt (C001-S04, lines #10–#12) was read aloud by two people, for the speech-to-text test. The "Speech" column in the benchmark files is the length given by the script's timestamps, not the length of a recording.
 
 ## Why on-device
 
-- **Privacy is the product.** In Taiwan, health and medical data is a special category of personal data under the Personal Data Protection Act (Art. 6). Existing AI note tools for therapists (Upheal, Mentalyc, Eleos) are cloud services.
+- **Privacy is the product.** In Taiwan, health and medical data is a special category of personal data under the Personal Data Protection Act (Art. 6). That does not forbid cloud tools; it means a clinic that uses one takes on a third-party processor, usually abroad, for its most sensitive records, and a small practice has no legal staff to assess that. The AI note tools we know of for therapists are cloud services:
+
+  | Product | Where it runs |
+  | --- | --- |
+  | Upheal | Vendor's cloud |
+  | Mentalyc | Vendor's cloud |
+  | Eleos Health | Vendor's cloud |
+  | Blueprint | Vendor's cloud |
+  | **Haven** | A machine in the clinic |
+
+  This is our reading of each vendor's public site in October 2026 and has not been checked with the vendors.
 - **The record has to last.** The Psychologists Act (Art. 25) requires practice records to be kept for at least 10 years. Notes that are wrong or invented stay wrong for a decade, so every sentence must be traceable.
-- **Local hardware is now big enough.** A 32GB card such as the Arc Pro B70 can hold a 27B–34B model at 4-bit, which is the size needed for usable Traditional Chinese clinical notes.
+- **One card has to hold the whole system.** The case for a 32 GB card is not that a bigger model writes better notes: on our three short sessions the 8B model was faster than the 32B one and had more sentences pass the verifier (see [docs/RESULTS.md](docs/RESULTS.md)), and that count does not measure note quality either way. The case is that speech-to-text, the note model and the context of several 50-minute sessions must sit on one card at the same time. **That has not been measured yet.** What is measured: Whisper and Qwen3-32B (4-bit) load together on one B70, and with both loaded about 4.9 GiB is left for the note model's context. Whether that is enough for one 50-minute session, let alone four rooms at once, is the open question; the measurement (peak memory and time for 1, 2 and 4 rooms, 8B against 32B, 16k against 32k context) is planned on the B70 and its numbers are pending.
 
 ## How it works
 
 ```mermaid
 flowchart LR
     A[Session audio<br/>with client consent] --> ASR[ASR agent<br/>Whisper, timestamps]
-    Q[Waiting-room questionnaires<br/>BSRS-5, PHQ-9, GAD-7] --> MEM
-    ASR --> ORCH[Orchestrator agent]
-    ORCH --> W[Note-writer agent<br/>SOAP / DAP]
+    ASR --> SPK[Speaker agent<br/>guesses therapist / client<br/>from the words]
+    Q[Waiting-room questionnaires<br/>BSRS-5, PHQ-9, GAD-7] --> O
+    SPK --> ORCH[Orchestrator]
+    ORCH --> W[Note-writer agent<br/>SOAP / DAP + R]
     W --> V[Verifier agent<br/>every sentence vs. transcript]
-    ORCH --> R[Risk agent<br/>cues + exact quotes]
+    ORCH --> R[Risk agent<br/>cues + exact quotes<br/>rules only, no model]
     ORCH --> O[Outcome agent<br/>reliable change, not-on-track]
-    V --> MEM[(Case memory<br/>local SQLite)]
-    O --> MEM
+    V --> DB[(Local SQLite<br/>drafts, signed notes,<br/>hash-chained audit log)]
+    O --> DB
+    DB --> MEM[Case memory<br/>keyword search, one client]
     ORCH <--> UI[Therapist UI<br/>review, edit, sign]
-    X[Cloud] -. no connection .- ORCH
+    UI --> SIGN[Signing gate on the server<br/>re-verifies, checks risk cues]
+    SIGN --> DB
 ```
+
+Haven makes no request to a cloud service. Where each part runs on the Stage II hardware:
+
+```mermaid
+flowchart TB
+    subgraph PC[One ASUS UGen workstation in the clinic]
+        subgraph GPU[Intel Arc Pro B70, 32 GB: 30.3 GiB usable]
+            WH[vLLM container, 127.0.0.1:8001<br/>whisper-large-v3-turbo<br/>UTIL 0.12]
+            LLM[vLLM container, 127.0.0.1:8000<br/>Qwen3-32B-AWQ, 4-bit<br/>UTIL 0.8: 18.1 GiB weights + 4.9 GiB context]
+        end
+        subgraph CPU[CPU]
+            HV[Haven, Python standard library, 127.0.0.1:8765<br/>orchestrator, risk, outcome, verifier rules,<br/>signing gate, SQLite]
+            BR[Browser: therapist UI]
+        end
+        BR <--> HV
+        HV -- audio, OpenAI transcription API --> WH
+        HV -- prompts, OpenAI chat API --> LLM
+    end
+```
+
+The memory figures are from the launcher's measured notes (`scripts/b70-vllm.sh`): with Whisper loaded, 24.5 of 30.3 GiB are free, and the note model at `UTIL=0.8` gets 18.1 GiB of weights and 4.9 GiB of context cache. Peak memory under load and power draw have not been measured. On a laptop the same code runs with Ollama or with no model at all, and Whisper runs in-process on the CPU.
+
+**Models**
+
+| Role | Model | Size and form | Memory for weights (measured) | Context in the launcher | Licence (per model card; check before release) |
+| --- | --- | --- | --- | --- | --- |
+| Notes, verifier check, speaker guess (B70) | [Qwen/Qwen3-32B-AWQ](https://huggingface.co/Qwen/Qwen3-32B-AWQ) | 32B, 4-bit AWQ | 18.1 GiB | 16,384 tokens | Apache-2.0 |
+| Alternative measured on the B70 | Qwen/Qwen3-14B | 14B, FP8 at load | 15.2 GiB | 16,384 | Apache-2.0 |
+| Alternative measured on the B70 | Qwen/Qwen3-8B | 8B, bf16 | 15.3 GiB | 16,384 | Apache-2.0 |
+| Speech-to-text (B70) | openai/whisper-large-v3-turbo | 809M | about 1.6 GB download; memory on the card not measured separately | 448 | MIT |
+| Notes on a laptop | qwen2.5:7b through Ollama | 7B, Ollama's default 4-bit | not measured | Ollama default | Apache-2.0 |
+| Speech-to-text on a laptop | faster-whisper `small` | int8, CPU | not measured | – | MIT |
+
+Served by vLLM 0.26.0 (`vllm/vllm-openai-xpu:v0.26.0`). The 16,384-token context is too small for a 50-minute session in one request, which is why the writer works in parts of 60 segments; a 32k setting is part of the pending B70 measurement.
 
 | Agent | What it does | Where |
 | --- | --- | --- |
-| ASR | Speech to timestamped segments (faster-whisper, int8) | `haven/transcript.py` |
+| ASR | Speech to timestamped segments. On the B70: whisper-large-v3-turbo served by vLLM through the OpenAI transcription API (`HAVEN_ASR=openai`). On a laptop: faster-whisper, int8, in-process | `haven/transcript.py` |
+| Speaker | Whisper gives no speakers, so the local LLM labels each segment therapist or client from its words. The labels are guesses, shown as 「（推測）」, and the risk agent and verifier treat them with care. No acoustic diarization | `haven/agents/speakers.py` |
 | Note writer | Drafts SOAP or DAP notes; every sentence cites segment ids. Both templates end with a risk section, R (風險與安全), with no sentence limit: a transcript line with a high-level risk cue that no sentence cites is added there as a quote, whichever engine wrote the note. The objective section is for the clinician's observations of behaviour and affect in the session, still cited; what a transcript cannot show (appearance, affect, orientation) the therapist adds. Sessions over 60 segments are written in parts of 60 and joined | `haven/agents/writer.py` |
 | Verifier | Checks each sentence against the segments it cites, in three layers: hard rules (numbers, time words and gendered pronouns must appear in the cited lines; a risk or behaviour word such as 想死, 割腕, 安眠藥 or 打 must be denied or stated as in the cited lines, with a double negation such as 「沒有一天不想死」 read as stated; a client's hedged self-criticism must not be written as fact), word overlap for the sentence and for each clause (a clause with no counterpart in the cited lines holds the sentence), then one batched local-LLM check for paraphrases. Signing is blocked until the therapist edits, deletes or confirms every unsupported sentence, every weak sentence about risk (suicide, self-harm, harm to others, abuse or substance wording, or a sentence citing a line with a risk cue), and every weak sentence the local model was asked about and rejected. If the model does not answer, the sentence says so (「本機模型未回應」) instead of reporting a model judgement | `haven/agents/verifier.py` |
 | Risk | Keyword and pattern matching, the same in every mode (no model is involved). Flags cues with the exact quote: suicidal ideation (direct, indirect and Taiwanese-language wording), preparation, plans or means, suicidal behaviour and past attempts, self-harm, harm to others including taking a child along, substance use, functioning, and **mandated-reporting cues** (family violence, child protection, elder or disability protection, sexual assault). A reporting cue names the law and asks the therapist to assess whether to report; Haven never reports anything itself. Negated cues are kept for review, a double negation is not lowered, another person's suicide is shown as background (not the client's ideation), and a therapist's restatement of a disclosure is scanned too. **The cue lists were widened from a reviewer's list on 2026-11-12 and are 待心理師確認: not yet checked by a licensed psychologist.** When suicide cues appear, shows which parts of a risk inquiry the session covered (ideation, frequency, plan, intent, access to means, past attempts, protective factors, safety plan, crisis resources) and which to consider asking or documenting | `haven/agents/risk.py` |
 | Outcome | Routine outcome monitoring: reliable change (PHQ-9: 6, GAD-7: 4), also between the last two sessions; clinically significant change; a not-on-track rule (from the third score on: still in the clinical range and not reliably improved since the first) with a review prompt; reminders, not "deteriorated" alerts, for the two single suicide items (PHQ-9 item 9 and BSRS-5 item 6, both from a score of 1, the BSRS-5 item adding referral advice from 2). BSRS-5 has no published reliable-change value, so 3 points is used and marked 暫定. Writes the score lines into the note's objective section | `haven/agents/outcome.py` |
 | Case memory | Keyword search over that client's own sessions only. "哪幾次提到父親？" is widened to the words clients use (爸爸, 我爸…), every session is searched, and the answer lists how many lines matched in each session with up to three shown per session. Risk topics (自殺, 想死, 自傷, 保護因子…) are widened too. A speaker shown as unknown or guessed stays that way. No match means the words did not match, and the page says so; it is not evidence the topic never came up. The word families are 待心理師確認 | `haven/agents/memory.py` |
-| Orchestrator | Runs the agents, times each one, stores the result and an audit log | `haven/orchestrator.py` |
+| Orchestrator | Runs the agents, times each one, stores the result and writes the audit log | `haven/orchestrator.py` |
+| Signing gate | Not an agent: the server-side check that decides whether a note can be signed (see below) | `haven/signing.py` |
 
 **Human in the loop:** Haven only produces drafts and prompts. A note is filed only after the therapist reviews and signs it. Haven does not diagnose or give any output to the client, and it does not analyse facial expressions.
 
@@ -45,7 +96,7 @@ flowchart LR
 - **Haven's own requests go to local addresses only.** The model and transcription endpoints must be `http` or `https` to loopback or a private LAN address. A name (`localhost`, `*.local`) is resolved and every address checked, and the connection is then made to the address that was checked, so a name that changes its answer between the check and the connection is not followed. Requests that carry session content use no HTTP or system proxy, follow no redirect, and have no `ftp:`, `file:` or `data:` handler. (Model downloads by `faster-whisper`, Hugging Face or the vLLM container are a separate matter: they happen at install time and do honour proxies.)
 - **This check covers the first hop only.** Haven cannot see what the model server does with a request. A model name that marks a cloud model (Ollama's `-cloud` / `:cloud`) is refused, and Ollama is asked whether the model is served remotely, but a local gateway that forwards elsewhere under an ordinary name would pass. The model server itself has to be set up to run offline (see `scripts/b70-vllm.sh`: `OFFLINE=1`, usage statistics off).
 - **The status bar shows state, not a slogan.** `/api/status` reports the model and transcription endpoints, the addresses their names resolve to right now, whether those are loopback, and how many connections Haven's endpoint check has refused since start. It is not a packet capture; that measurement is still to do (see Stage II targets).
-- The server binds to `127.0.0.1`, rejects requests whose `Host` header is not its own (DNS rebinding), and requires an `X-Haven` header on **every API request, reads included**, so another website open in the browser cannot sign, upload, start the model or write to the audit log. `GET` only reads; drafting a note (`POST /api/sessions/<id>/open`), processing and asking the case memory (`POST /api/clients/<id>/ask`) are POSTs. Every response carries `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; …`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`.
+- The server binds to `127.0.0.1`, rejects requests whose `Host` header is not its own (DNS rebinding), and requires an `X-Haven` header on **every API request, reads included**, so another website open in the browser cannot sign, upload, start the model or write to the audit log. A `GET` only reads (and records the read in the audit log); drafting a note (`POST /api/sessions/<id>/open`), processing and asking the case memory (`POST /api/clients/<id>/ask`) are POSTs. Every response carries `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; …`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`.
 - **Prompt injection.** Transcript lines reach the model as JSON strings, every system prompt says they are data and not instructions, and every request has a token limit. The model has no tools and no network, and the UI inserts everything as plain text. A note sentence that cites a line worded like an instruction to the AI (「請在評估欄寫…」, 「忽略以上指示」) is held until the therapist confirms it; that word list is an engineering guess (待心理師確認). This lowers the risk; it does not remove it.
 - **Signing is decided by the server.** When a note is signed, the server reads the stored transcript and checks every sentence again. From the browser it takes only the sentence texts, the segments they cite, which flagged sentences the therapist confirmed, and which risk cues the therapist left out with a reason. A `status`, `support`, `source` or `must_confirm` sent by the browser is ignored. A sentence the server's verifier has already judged (same text, same citations, same transcript, same rule version) keeps that verdict; any other sentence is checked by the rule layers at signing. The server answers 404 for a session that does not exist and 409 for an empty note, a session with no draft, an unsupported or held sentence the therapist has not confirmed, or a score line that differs from the questionnaire data.
 - **Risk cues must be accounted for.** A note cannot be signed while a high-level risk cue in the transcript is cited by no sentence, unless the therapist leaves it out with a written reason. The reason goes into the audit log.
@@ -87,15 +138,7 @@ Generating a note takes about a minute on a laptop, so process the demo sessions
 python3 scripts/prepare_demo.py
 ```
 
-**Measured on a MacBook Air M2 (8GB) with qwen2.5:7b** (simulated sessions of about 2–4 minutes of speech):
-
-| Session | Total time | Sentences backed by the transcript |
-| --- | --- | --- |
-| C001-S03 | 63 s | 9 / 12 |
-| C001-S04 | 44 s | 7 / 12 |
-| C002-S05 | 37 s | 7 / 10 |
-
-Score lines filled in from the questionnaires are not counted. What the verifier caught in these runs: "下週五" where the session said "這週五", "近兩週" attached to a statement that had no time frame, and feelings ("自責") the cited line did not contain. It also flags some correct paraphrases; the therapist clears those with 「保留此句（我已核對）」. A 7B model on a laptop is the floor; Stage II moves to a larger model on the Arc Pro B70.
+On a MacBook Air M2 (8 GB) with qwen2.5:7b a note for one of the short demo sessions took 61–109 s ([docs/benchmarks/m2-air-openai-compat-qwen2.5-7b.md](docs/benchmarks/m2-air-openai-compat-qwen2.5-7b.md), 2026-11-03). An earlier table here gave 37–63 s from a run whose result file was never saved; it has been removed. What the verifier caught in those laptop runs: "下週五" where the session said "這週五", "近兩週" attached to a statement that had no time frame, and feelings ("自責") the cited line did not contain. It also flags some correct paraphrases; the therapist clears those with 「保留此句（我已核對）」. A 7B model on a laptop is the floor.
 
 ### On the Arc Pro B70 (Stage II)
 
@@ -105,7 +148,7 @@ The B70 runs models through vLLM (XPU), llama.cpp (SYCL) or OpenVINO Model Serve
 HAVEN_LLM=openai HAVEN_LLM_URL=http://127.0.0.1:8000 HAVEN_MODEL=<served model name> python3 -m haven
 ```
 
-The endpoint check still applies: only this machine or the clinic LAN is accepted (loopback, 10/8, 172.16/12, 192.168/16, fc00::/7; a `.local` name must resolve to one of them). Redirects are not followed.
+The endpoint check still applies: only this machine or the clinic LAN is accepted (loopback, 10/8, 172.16/12, 192.168/16, fc00::/7; a `.local` name must resolve to one of them). Redirects are not followed. A private address is not proof of a clinic LAN (VPNs and public Wi-Fi use the same ranges), and the connection to a LAN server is plain HTTP unless you configure `https`; the supported setup is a model server on the same machine.
 
 On a B70 with Docker, `scripts/b70-vllm.sh` starts vLLM on one card, listening on 127.0.0.1 only:
 
@@ -114,16 +157,20 @@ bash scripts/b70-vllm.sh Qwen/Qwen3-32B-AWQ qwen3-32b-awq
 HAVEN_LLM=openai HAVEN_MODEL=qwen3-32b-awq python3 -m haven
 ```
 
-**Measured on one Arc Pro B70 32GB** (vLLM 0.26.0, the same three simulated sessions, 2–4 minutes of speech each):
+**Measured on one Arc Pro B70 32GB** on 2026-11-07 (vLLM 0.26.0; the three scripted sessions, 110–232 s of speech by the script's timestamps; one run each; note model alone on the card, `UTIL=0.9`, no Whisper beside it):
 
-| Model on one card | Memory for weights | Draft note per session | 4 rooms at once | Output tok/s | Verifier test set: wrong blocked / right blocked |
+| Model on one card | Memory for weights | Draft note per session | 4 short sessions at once | Output tok/s | Sentences that passed the verifier |
 | --- | --- | --- | --- | --- | --- |
-| Qwen3-8B, bf16 | 15.3 GiB | 12–17 s | 17 s | 34 | – |
-| Qwen3-14B, FP8 | 15.2 GiB | 18–24 s | 24 s | 34 | 26/30 / 0/18 |
-| Qwen3-32B, 4-bit AWQ | 18.1 GiB | 20–29 s | 30 s | 26 | 26/30 / 0/18 |
-| *MacBook Air M2 8GB, qwen2.5:7b* | | *37–109 s* | *2 rooms: 222 s* | *5–8* | *27/30 / 1/18* |
+| Qwen3-8B, bf16 | 15.3 GiB | 11.8–16.6 s | 17.0 s | 34 | 27 of 32 |
+| Qwen3-14B, FP8 | 15.2 GiB | 17.5–23.9 s | 24.4 s | 34 | 26 of 43 |
+| Qwen3-32B, 4-bit AWQ | 18.1 GiB | 19.5–29.2 s | 30.3 s | 26 | 21 of 36 |
 
-The B70 verifier figures were measured before the weak-risk-sentence rule; the laptop figures after it. A 32B model at 4-bit fits on one card with room for four rooms' context; on an 8GB laptop it does not fit at all. Details in [docs/benchmarks](docs/benchmarks) and [docs/verifier-eval](docs/verifier-eval).
+Read this table for speed and memory only.
+
+- **The times are for the note and the verifier check, starting from a finished transcript.** Speech-to-text is not included, and the sessions are 2–4 minutes long, not 50.
+- **"4 at once" was measured without Whisper on the card.** With Whisper loaded the note model has 4.9 GiB for context, and four 50-minute sessions at once have not been tried.
+- **"Passed the verifier" is not accuracy.** A sentence that did not pass may be a real error or a correct paraphrase the verifier held back; the two have not been separated yet (a clinician's reading of the flagged sentences is planned). Notes also vary between runs: a second run of C002-S05 on the 32B model gave 5 of 10 instead of 2 of 10. These runs predate the 2026-11-12 fixes (verifier rules, the risk section, prompts as JSON), so the counts will change when re-run.
+- Source files: [docs/benchmarks](docs/benchmarks). All figures, definitions and what is still pending are collected in [docs/RESULTS.md](docs/RESULTS.md).
 
 ### Measuring performance
 
@@ -146,7 +193,18 @@ Notes vary from run to run, so `--repeat 3` runs each session three times and re
 python3 scripts/verifier_eval.py
 ```
 
-Runs the verifier on 48 note sentences about the simulated sessions: 18 correct ones and 30 with a known error (wrong number, time word, pronoun or speaker, reversed risk statement, invented content, overstated frequency, unmade diagnosis, wrong citation). Reports how many wrong sentences block signing and how many correct ones are flagged by mistake, per error type, in [docs/verifier-eval](docs/verifier-eval). On a laptop with qwen2.5:7b: 27/30 wrong sentences blocked, 1/18 correct ones held for confirmation. Since the Stage II review, a risk sentence that only the model supports also blocks signing until the therapist confirms it: one more wrong sentence is caught, and one correct risk sentence (V22) now needs a click. After the 2026-11-12 review fixes, the rule layers alone block 28/30 wrong sentences and 2/18 correct ones ([rules-only](docs/verifier-eval/rules-only.md)); the figures with a model in this README were measured before those fixes and have not been re-run. The cases were written by the team, so treat these numbers as a regression check, not an independent accuracy figure.
+Runs the verifier on 48 note sentences about the simulated sessions: 18 correct ones and 30 with a known error (wrong number, time word, pronoun or speaker, reversed risk statement, invented content, overstated frequency, unmade diagnosis, wrong citation). Reports how many wrong sentences block signing and how many correct ones are flagged by mistake, per error type, in [docs/verifier-eval](docs/verifier-eval).
+
+"Blocked" has one meaning here and in every current file: the sentence stops signing until the therapist acts, that is, it is marked unsupported, or it is weak and held (about risk, rejected by the model, or citing an instruction-like line). The B70 files from 2026-11-07 used an older meaning (unsupported only) and older rules; they are labelled "before the fixes" below and are not comparable with the current figure.
+
+| Run | Date | Wrong sentences blocked | Correct sentences blocked | Definition and rules |
+| --- | --- | --- | --- | --- |
+| Rule layers only, no model | 2026-11-12 | 28/30 | 2/18 | current |
+| qwen2.5:7b, laptop | 2026-11-08 | 27/30 | 1/18 | current definition, rules before the 2026-11-12 fixes |
+| Qwen3-14B, B70 | 2026-11-07 | 26/30 | 0/18 | before the fixes: old definition, old rules |
+| Qwen3-32B, B70 | 2026-11-07 | 26/30 | 0/18 | before the fixes: old definition, old rules |
+
+The runs with a model have not been repeated since the fixes; re-running them on the B70 is pending. The cases were written by the team, so treat these numbers as a regression check, not an independent accuracy figure.
 
 ### Transcribing real audio
 
@@ -168,6 +226,8 @@ HAVEN_LLM=openai HAVEN_MODEL=qwen3-32b-awq HAVEN_ASR=openai python3 -m haven
 ```
 
 Start Whisper first and wait for it: two servers loading at once fail each other's memory check. With Whisper loaded, 24.5 of the card's 30.3 GiB stay free, which is why the note model runs at `UTIL=0.8`.
+
+**Measured once on the B70** (week of 2026-11-10, whisper-large-v3-turbo through vLLM, no prompt): C001-S04 lines #10–#12 read aloud by two people, 23.0 s of audio, transcribed in 0.5 s with a character error rate of 14.1%; Qwen3-32B-AWQ then guessed the speaker of all three segments correctly in 2.3 s. Three segments from one clip is a smoke test, not an accuracy figure, and 14.1% is above the 10% target. The result files of that run are still on the B70 and not in this repository yet: see [docs/asr-eval](docs/asr-eval/README.md).
 
 Recordings are streamed to a temp file, sent to the local server, and deleted after transcription. Then the local LLM guesses from the words who is speaking (one therapist, one client). There is no acoustic diarization yet, so the guesses are shown as 「（推測）」 and treated with care:
 
@@ -219,39 +279,45 @@ Leaving a session with unsigned edits asks first: a draft's edits live in the pa
 | `HAVEN_ASR_MODEL` | `small` (`whisper` for `openai`) | faster-whisper model size, or the served model name |
 | `HAVEN_ASR_TIMEOUT` | `900` | Seconds to wait for a transcription |
 | `HAVEN_ASR_PROMPT` | a short Traditional Chinese line for `faster-whisper`, none for `openai` | Text given to Whisper before the audio. On the B70 a prompt made whisper-large-v3-turbo drop or repeat the last utterance of a clip, so the server gets none |
-| `HAVEN_HOST` / `HAVEN_PORT` | `127.0.0.1` / `8765` | Where the UI is served |
+| `HAVEN_HOST` / `HAVEN_PORT` | `127.0.0.1` / `8765` | Where the UI is served. **Leave the host at `127.0.0.1`.** Haven has no login: on any other address everyone who can reach the port can read every transcript and sign notes. LAN use is not supported yet; besides, requests whose `Host` header is not `HAVEN_HOST`, `localhost` or `127.0.0.1` are refused, so `0.0.0.0` does not make the UI reachable by the machine's LAN address. Haven prints a warning at start when the host is not loopback |
+| `HAVEN_DATA_DIR` | `data/` in the repository | Where transcripts, the client file and the database are kept. For real use, point it outside the repository |
+| `HAVEN_LLM_TIMEOUT` | `180` | Seconds to wait for the note model |
 
 ## Stage II plan (Arc Pro B70)
 
-| Item | Plan |
+| Item | Status |
 | --- | --- |
-| LLM | Running: Qwen3-32B at 4-bit on one card with vLLM (see the table above). Next: compare Traditional Chinese note quality against Qwen3-14B and MediaTek Breeze 2 with psychologist ratings |
-| ASR | Built: Whisper on the GPU through vLLM, speakers guessed by the local LLM. Next: measure character error rate and speaker accuracy on the B70; acoustic diarization (pyannote) and a speaker-correction step in the UI |
-| Storage | SQLCipher encryption at rest, full-disk encryption |
-| Validation | 10–20 simulated sessions labelled by a licensed psychologist |
+| LLM | Running: Qwen3-32B at 4-bit on one card with vLLM. Not done: a comparison of note quality between models by a psychologist (the pass counts above do not measure it) |
+| ASR | Built: Whisper on the GPU through vLLM, speakers guessed by the local LLM; measured once on a 23-second clip. Not done: a recording of 10 minutes or more, acoustic diarization, a speaker-correction step in the UI |
+| Storage | Files are private to the account (0600/0700). Not done: SQLCipher encryption at rest; use full-disk encryption meanwhile |
+| Validation | Not done: 10–20 simulated sessions labelled by a licensed psychologist |
 
-Targets to validate on the B70. These are goals, not measured results yet:
+Targets, with what has been measured so far. A target without a measurement is a goal, not a result:
 
-| Metric | Target |
-| --- | --- |
-| 50-minute session to draft note | ≤ 5 minutes |
-| Concurrent rooms | ≥ 4 |
-| Character error rate | ≤ 10% |
-| Note sentences backed by the transcript | ≥ 95% |
-| Risk-cue recall vs. psychologist labels | ≥ 90% |
-| Outbound network connections during a session | 0 (packet capture) |
+| Metric | Target | Measured |
+| --- | --- | --- |
+| 50-minute session to draft note, including speech-to-text | ≤ 5 minutes | pending (only 2–4 minute sessions, without speech-to-text: 12–29 s) |
+| Concurrent rooms, 50-minute sessions, Whisper on the same card | ≥ 4 | pending |
+| Peak memory and power draw under that load | – | pending |
+| Character error rate | ≤ 10% | 14.1% on one 23-second clip; a longer recording is pending |
+| Note sentences backed by the transcript, as judged by a clinician | ≥ 95% | pending (needs the clinician's reading of flagged sentences) |
+| Risk-cue recall vs. psychologist labels | ≥ 90% | pending (no psychologist-labelled set yet; see Limitations) |
+| Outbound network connections during a session | 0 (packet capture) | pending |
 
 ## Limitations
 
 - **Risk detection is word matching and its lists are 待心理師確認.** `tests/test_risk_recall.py` reports recall per category on the 64 sentences from the 2026-11-12 clinical review (before: about 22% on the suicide sentences; now 64/64). The lists were written with those sentences in view, so that figure is a regression check, not accuracy. On 16 risk sentences written afterwards and not used to build the lists, 3 were flagged (19%); six everyday sentences such as 「想到期末考就想死」 still raise a high-level flag. "No cue found" never means "no risk". A local-LLM pass that can only add flags, and a psychologist-labelled test set, are still to do.
 - The reporting cues quote article numbers as given in the review; check them against 全國法規資料庫 before relying on them. Haven has no reporting workflow yet: it shows the prompt and, at signing, requires the cue to be in the note or left out with a reason.
+- **No encryption at rest and no accounts.** Anyone with this user account or the disk can read everything; the audit log does not say who acted; `signed_by` is a name typed into a dialog. Haven is not presented as compliant with the Personal Data Protection Act: consent versions and withdrawal, retention and deletion after 10 years, data-subject requests and handling of minors are not built.
+- **Loopback is not a security boundary.** Any program on the machine can call the API with the `X-Haven` header, including a model container started with `--net=host` (as `scripts/b70-vllm.sh` does). The launcher is a demonstration script: its hardening options are untested on the B70.
+- **A draft's edits are not saved until signing.** Closing the page loses them (the page asks first).
 - The rule-based engine is for the prototype.
 - The verifier's bigram overlap is a first filter. Paraphrased sentences are sent to the local LLM for a second check when one is running. Without a model, a sentence with an unmatched clause is marked weak but does not block signing unless it is about risk.
 - Writing long sessions in parts of 60 segments has been tested with a stand-in model only, not yet on the B70; each part is written without seeing the others.
 - The not-on-track rule (not reliably improved by the third score, still in the clinical range) is a heuristic, not a validated expected-recovery curve; it and the BSRS-5 stand-in threshold are 待心理師確認. "Clinically significant change" is judged per questionnaire, not on PHQ-9 and GAD-7 together as IAPT does.
 - Case memory is keyword matching with hand-written word families; a topic described in other words is missed.
 - Uploaded audio has no acoustic speaker diarization yet. Speakers are guessed by the LLM from the words; the therapist cannot yet correct a label in the UI, so lines from guessed speakers are flagged more and counted less (see "Transcribing real audio").
-- There is no login yet: the server only listens on the machine itself. A LAN deployment in Stage II needs therapist accounts, per-therapist access to clients and TLS.
+- A LAN deployment needs therapist accounts, per-therapist access to clients and TLS; none exists, so Haven is single-machine only (see `HAVEN_HOST`).
 - The negation rule compares the same word in the sentence and in the cited lines, clause by clause. It does not read a denial placed after the word (「自殺意念：無」), and for a risk sentence in other words than the source's it falls back to a coarse check that flags some correct sentences; the therapist confirms them.
 - The checklist detects whether a topic came up by keywords near suicide talk. It cannot judge the quality of the inquiry, and 「安全計畫」 is ticked when one is mentioned or proposed, not when its content is complete.
 
