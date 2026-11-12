@@ -17,6 +17,10 @@ from .models import Note, NoteSentence, to_dict
 from .transcript import load_transcript
 
 
+# Fewer characters than this is a few sentences, not a session: the result carries a warning.
+SHORT_TRANSCRIPT = 60
+
+
 def load_clients() -> list[dict]:
     return json.loads(config.CLIENTS_FILE.read_text(encoding="utf-8"))
 
@@ -45,7 +49,7 @@ class Orchestrator:
     def measure_sentences(self, client: dict, session_no: int) -> list[str]:
         """The score lines for one session, built from the questionnaire data. These
         are the only sentences accepted as source="measure"."""
-        return [s["text"] for s in self.outcome.note_sentences(client, session_no)]
+        return self.outcome.note_sentences(client, session_no)
 
     def process_session(self, session_id: str, template: str = "SOAP") -> dict:
         # A signed note is the record. Nothing that could replace what the
@@ -74,6 +78,8 @@ class Orchestrator:
         risk = timed("risk", self.risk.run, transcript)
         outcome = timed("outcome", self.outcome.run, client)
 
+        spoken = sum(len(s.text) for s in transcript.segments)
+        short = [f"逐字稿很短（{len(transcript.segments)} 段、{spoken} 字），請確認這是完整的會談錄音。"] if spoken < SHORT_TRANSCRIPT else []
         result = {
             "session_id": session_id,
             "client_id": client["id"],
@@ -82,7 +88,7 @@ class Orchestrator:
             "simulated": transcript.simulated,
             # What actually wrote this draft: the model's name, or the rule engine when the model did not answer.
             "engine": note.engine,
-            "warnings": note.warnings + verification.get("warnings", []),
+            "warnings": short + note.warnings + verification.get("warnings", []),
             "transcript": [to_dict(s) for s in transcript.segments],
             "note": to_dict(note),
             "verification": verification,
@@ -127,8 +133,14 @@ class Orchestrator:
         """Pre-session brief: last plan, last risk picture, outcome alerts."""
         client = get_client(client_id)
         # Uses stored results only, so opening a client never waits on the model.
-        sessions = client.get("sessions", [])
-        last = store.get_result(sessions[-1]) if sessions else None
+        # The newest session may not have a note yet (just uploaded, never opened):
+        # the brief then comes from the most recent session that has one, and says so.
+        last, not_processed = None, []
+        for session_id in reversed(client.get("sessions", [])):
+            last = store.get_result(session_id)
+            if last:
+                break
+            not_processed.insert(0, session_id)
         plan = []
         if last:
             # Prefer the signed note; otherwise show only sentences the verifier backed.
@@ -144,5 +156,7 @@ class Orchestrator:
                 "risk_level": last["risk"]["level"],
             },
             "plan": plan,
+            # Sessions after ``last_session`` with no note yet; the brief does not cover them.
+            "not_processed": not_processed,
             "outcome": self.outcome.run(client),
         }

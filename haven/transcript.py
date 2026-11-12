@@ -65,6 +65,11 @@ def _clean(text: str) -> str:
     return _opencc(text) if _opencc else text
 
 
+# Characters per second of conversational Mandarin, used only to estimate
+# timestamps when the transcription server returns text without a duration.
+SPEECH_RATE = 4.0
+
+
 class ASRError(Exception):
     """The speech-to-text server answered, but not with a usable transcript."""
 
@@ -74,6 +79,10 @@ def _sentences(text: str, duration: float) -> list[tuple[float, float, str]]:
     by length, so a whole session is never one line that every citation points to."""
     parts = [p for p in re.findall(r"[^。！？!?]+[。！？!?]?", text) if p.strip()]
     total = sum(len(p) for p in parts) or 1
+    if duration <= 0:
+        # The server gave no length. Without one every line would start at 0:00 and
+        # "jump to this line" would go nowhere, so estimate from the speaking rate.
+        duration = total / SPEECH_RATE
     out, t = [], 0.0
     for p in parts:
         d = duration * len(p) / total
@@ -154,5 +163,8 @@ def save_transcript(t: Transcript) -> Path:
         "simulated": t.simulated,
         "segments": [s.__dict__ for s in t.segments],
     }
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    # Written beside the target and renamed, so a reader never sees half a file.
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(path)
     return path

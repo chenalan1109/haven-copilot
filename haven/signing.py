@@ -141,7 +141,7 @@ def summarize(note: dict) -> dict:
     counts = {k: sum(1 for s in claims if s.get("status") == k) for k in ("supported", "weak", "unsupported")}
     n = len(claims)
     return {"total": n, **counts, "supported_ratio": round(counts["supported"] / n, 3) if n else 0.0,
-            "must_confirm": 0, "ready_to_sign": False, "verifier_version": VERIFIER_VERSION}
+            "verifier_version": VERIFIER_VERSION}
 
 
 def check(session_id: str, transcript: Transcript, payload, template: str, engine: str, measures: list[str], verifier: Verifier) -> tuple[Note, dict, list[str]]:

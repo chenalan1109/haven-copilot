@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 import mimetypes
 import re
+import sys
 import tempfile
 import threading
+import traceback
 from datetime import date
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -20,12 +22,22 @@ from .orchestrator import Orchestrator, get_client, load_clients
 from .transcript import ASRError, load_transcript, save_transcript, transcribe_audio
 
 ORCH: Orchestrator | None = None
-MAX_UPLOAD = 200 * 1024 * 1024
+MAX_UPLOAD = 200 * 1024 * 1024  # a session recording
+MAX_JSON = 2 * 1024 * 1024  # a note, a signature, an addendum
+# A connection that sends nothing for this long is closed, so half-open
+# connections cannot hold threads for ever (slow-loris).
+CONNECTION_TIMEOUT = 30
 # What the consent box covers, written to the audit log with each upload.
 CONSENT_SCOPE = "v1:recording+local-ai-transcription+speaker-guess+transcript-kept"
 AUDIO_SUFFIXES = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".opus", ".webm"}
 SESSION_ID = re.compile(r"^[A-Za-z0-9-]{1,40}$")
 CLIENTS_LOCK = threading.Lock()
+# Uploads being transcribed: session id -> (client id, session number). Guarded by
+# CLIENTS_LOCK. Transcription takes minutes; without the reservation two uploads
+# with the same id both pass the "exists" check and the second replaces the first.
+UPLOADING: dict[str, tuple[str, int]] = {}
+_LOCKS_GUARD = threading.Lock()
+_SESSION_LOCKS: dict[str, threading.Lock] = {}
 # Sent by the UI on every POST. A cross-site page cannot add a custom header
 # without a CORS preflight, which this server never approves, so another
 # website open in the therapist's browser cannot sign or upload.
@@ -39,6 +51,46 @@ def _allowed_hosts() -> set[str]:
 
 class BadRequest(ValueError):
     pass
+
+
+class HttpError(Exception):
+    """A request answered with a given status and a message for the therapist."""
+
+    def __init__(self, status: HTTPStatus, message: str, zh: str | None = None):
+        super().__init__(message)
+        self.status, self.zh = status, zh
+
+
+def _no_session() -> HttpError:
+    return HttpError(HTTPStatus.NOT_FOUND, "no such session", "找不到這次會談。")
+
+
+def _client(client_id: str) -> dict:
+    try:
+        return get_client(client_id)
+    except KeyError:
+        raise HttpError(HTTPStatus.NOT_FOUND, "no such client", "找不到這位個案。") from None
+
+
+def _transcript(sid: str):
+    """The stored transcript, or 404. Only "the file is not there" is a 404: a
+    damaged file or a transcript naming an unknown client is a server fault (500)."""
+    try:
+        return load_transcript(sid)
+    except FileNotFoundError:
+        raise _no_session() from None
+
+
+def _session_lock(sid: str) -> threading.Lock:
+    with _LOCKS_GUARD:
+        return _SESSION_LOCKS.setdefault(sid, threading.Lock())
+
+
+def _log_fault(e: BaseException) -> None:
+    """Where an unexpected error happened, for the terminal. The exception's
+    message is left out: it can quote the request (a KeyError names the key)."""
+    frames = "".join(traceback.format_tb(e.__traceback__)[-4:])
+    print(f"Haven: unexpected {type(e).__name__}\n{frames}", file=sys.stderr, end="")
 
 
 def _session_id(value: str) -> str:
@@ -61,7 +113,7 @@ class Refused(Exception):
 def _draft(sid: str) -> tuple[dict, object, list[str]]:
     """The stored draft, the transcript and the server's score lines for a session
     that can still be changed."""
-    transcript = load_transcript(sid)  # FileNotFoundError: no such session (404)
+    transcript = _transcript(sid)
     if store.get_signature(sid):
         raise Refused("this session is already signed; signed notes are not overwritten",
                       "這次會談已經簽核，簽核後的紀錄不能再修改。需要更正時，請新增「補充說明」。")
@@ -76,12 +128,23 @@ def _draft(sid: str) -> tuple[dict, object, list[str]]:
 
 def _session_view(sid: str) -> dict:
     """What the session page shows. Once signed, that is the signed note, not the draft."""
-    result = store.get_result(sid)
+    if not (config.SESSIONS_DIR / f"{sid}.json").is_file():
+        raise _no_session()
     signature = store.get_signature(sid)
-    if result is None:
-        result = ORCH.process_session(sid)
-    elif not signature and result.get("verification", {}).get("verifier_version") != VERIFIER_VERSION:
-        result = ORCH.refresh(result)  # a draft checked under older rules
+
+    def stale(r):
+        return not signature and r.get("verification", {}).get("verifier_version") != VERIFIER_VERSION
+
+    result = store.get_result(sid)
+    if result is None or stale(result):
+        # One pipeline run per session: of several requests opening a session for
+        # the first time, one drafts the note and the others wait and read it.
+        with _session_lock(sid):
+            result = store.get_result(sid)
+            if result is None:
+                result = ORCH.process_session(sid)
+            elif stale(result):
+                result = ORCH.refresh(result)  # a draft checked under older rules
     result["signature"] = signature
     result["signed"] = bool(signature)
     result["addenda"] = store.get_addenda(sid) if signature else []
@@ -109,6 +172,7 @@ def _client_summary(c: dict) -> dict:
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "Haven/0.1"
+    timeout = CONNECTION_TIMEOUT
 
     def log_message(self, fmt, *args):  # keep transcripts out of console logs
         pass
@@ -131,11 +195,52 @@ class Handler(BaseHTTPRequestHandler):
         # sends its own name in the Host header.
         return self.headers.get("Host", "") in _allowed_hosts()
 
+    def _content_length(self, limit: int) -> int:
+        raw = self.headers.get("Content-Length")
+        if raw is None:
+            raise HttpError(HTTPStatus.LENGTH_REQUIRED, "Content-Length is required")
+        # int() would accept "-1", "+5" and " 5 "; read(-1) reads until the connection closes.
+        if not re.fullmatch(r"[0-9]{1,15}", raw.strip()):
+            raise BadRequest("Content-Length must be a non-negative number")
+        length = int(raw)
+        if length > limit:
+            raise HttpError(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, f"the request body is larger than {limit} bytes",
+                            "送出的內容太大。")
+        return length
+
     def _body(self) -> bytes:
-        length = int(self.headers.get("Content-Length", 0))
-        if length > MAX_UPLOAD:
-            raise ValueError("upload too large")
-        return self.rfile.read(length)
+        length = self._content_length(MAX_JSON)
+        body = self.rfile.read(length)
+        if len(body) < length:
+            raise BadRequest("the request body ended early")
+        return body
+
+    def _guard(self, route) -> None:
+        """Runs one request. Whatever goes wrong, the client gets a JSON answer:
+        an unexpected error is a 500 with no detail, never a dropped connection."""
+        try:
+            return route()
+        except (BadRequest, signing.BadNote) as e:
+            self._error(HTTPStatus.BAD_REQUEST, str(e), "送出的資料格式不正確。")
+        except HttpError as e:
+            self._error(e.status, str(e), e.zh)
+        except Refused as e:
+            self._error(HTTPStatus.CONFLICT, str(e), e.zh, **e.extra)
+        except store.AlreadySignedError:
+            self._error(HTTPStatus.CONFLICT, "this session is already signed; signed notes are not overwritten",
+                        "這次會談已經簽核，簽核後的紀錄不能再修改。需要更正時，請新增「補充說明」。")
+        except (BrokenPipeError, ConnectionResetError):
+            self.close_connection = True  # the browser went away; nobody to answer
+        except TimeoutError:
+            self.close_connection = True
+            self._error(HTTPStatus.REQUEST_TIMEOUT, "the request body did not arrive in time", "上傳逾時，請再試一次。")
+        except Exception as e:  # noqa: BLE001 - the last line of defence
+            _log_fault(e)
+            self.close_connection = True
+            try:
+                self._error(HTTPStatus.INTERNAL_SERVER_ERROR, "internal error", "伺服器發生錯誤，這個操作沒有完成。請看終端機的訊息。")
+            except OSError:
+                pass
 
     def _static(self, path: str):
         rel = "index.html" if path in ("", "/") else path.lstrip("/")
@@ -152,73 +257,71 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self._host_ok():
             return self._error(HTTPStatus.FORBIDDEN, "unexpected Host header")
+        self._guard(self._get)
+
+    def _get(self):
         url = urlparse(self.path)
         parts = [p for p in url.path.split("/") if p]
         query = parse_qs(url.query)
-        try:
-            if parts[:1] != ["api"]:
-                return self._static(url.path)
-            if parts == ["api", "status"]:
-                return self._json({
-                    "engine": ORCH.engine,
-                    "bind": f"{config.HOST}:{config.PORT}",
-                    "llm_endpoint": ORCH.llm.url if ORCH.llm else None,
-                    "cloud_calls": 0,
-                })
-            if parts == ["api", "clients"]:
-                return self._json([_client_summary(c) for c in load_clients()])
-            if len(parts) == 4 and parts[1] == "clients" and parts[3] == "brief":
-                return self._json(ORCH.brief(parts[2]))
-            if len(parts) == 4 and parts[1] == "clients" and parts[3] == "ask":
-                q = query.get("q", [""])[0].strip()
-                if not q:
-                    return self._error(HTTPStatus.BAD_REQUEST, "q is required")
-                store.audit("ask", f"{parts[2]}")
-                return self._json(ORCH.memory.ask(get_client(parts[2]), q))
-            if len(parts) == 3 and parts[1] == "sessions":
-                return self._json(_session_view(_session_id(parts[2])))
-            if parts == ["api", "audit"]:
-                return self._json(store.recent_audit())
-            return self._error(HTTPStatus.NOT_FOUND, "unknown endpoint")
-        except BadRequest as e:
-            return self._error(HTTPStatus.BAD_REQUEST, str(e))
-        except (KeyError, FileNotFoundError):
-            return self._error(HTTPStatus.NOT_FOUND, "not found")
+        if parts[:1] != ["api"]:
+            return self._static(url.path)
+        if parts == ["api", "status"]:
+            return self._json({
+                "engine": ORCH.engine,
+                "bind": f"{config.HOST}:{config.PORT}",
+                "llm_endpoint": ORCH.llm.url if ORCH.llm else None,
+                "cloud_calls": 0,
+            })
+        if parts == ["api", "clients"]:
+            return self._json([_client_summary(c) for c in load_clients()])
+        if len(parts) == 4 and parts[1] == "clients" and parts[3] == "brief":
+            _client(parts[2])
+            return self._json(ORCH.brief(parts[2]))
+        if len(parts) == 4 and parts[1] == "clients" and parts[3] == "ask":
+            q = query.get("q", [""])[0].strip()
+            if not q:
+                raise BadRequest("q is required")
+            client = _client(parts[2])  # an unknown client is a 404 and leaves no audit row
+            store.audit("ask", client["id"])
+            return self._json(ORCH.memory.ask(client, q))
+        if len(parts) == 3 and parts[1] == "sessions":
+            return self._json(_session_view(_session_id(parts[2])))
+        if parts == ["api", "audit"]:
+            return self._json(store.recent_audit())
+        return self._error(HTTPStatus.NOT_FOUND, "unknown endpoint")
 
     def do_POST(self):
         if not self._host_ok():
             return self._error(HTTPStatus.FORBIDDEN, "unexpected Host header")
         if self.headers.get(CSRF_HEADER) != "1":
             return self._error(HTTPStatus.FORBIDDEN, f"missing {CSRF_HEADER} header")
+        # An error may leave part of the body unread; it must not be parsed as the next request.
+        self.close_connection = True
+        self._guard(self._post)
+
+    def _post(self):
         url = urlparse(self.path)
         parts = [p for p in url.path.split("/") if p]
         query = parse_qs(url.query)
-        try:
-            if len(parts) == 4 and parts[1] == "sessions":
-                sid = _session_id(parts[2])
-                if parts[3] == "process":
-                    return self._process(sid, query)
-                if parts[3] == "verify":
-                    return self._verify(sid)
-                if parts[3] == "sign":
-                    return self._sign(sid)
-                if parts[3] == "addendum":
-                    return self._addendum(sid)
-            if parts == ["api", "upload"]:
-                return self._upload(query)
-            return self._error(HTTPStatus.NOT_FOUND, "unknown endpoint")
-        except Refused as e:
-            return self._error(HTTPStatus.CONFLICT, str(e), e.zh, **e.extra)
-        except store.AlreadySignedError:
-            return self._error(HTTPStatus.CONFLICT, "this session is already signed; signed notes are not overwritten",
-                               "這次會談已經簽核，簽核後的紀錄不能再修改。需要更正時，請新增「補充說明」。")
-        except (KeyError, FileNotFoundError):
-            return self._error(HTTPStatus.NOT_FOUND, "not found", "找不到這次會談。")
-        except (ValueError, TypeError, json.JSONDecodeError) as e:
-            return self._error(HTTPStatus.BAD_REQUEST, str(e), "送出的資料格式不正確。")
+        if len(parts) == 4 and parts[1] == "sessions":
+            sid = _session_id(parts[2])
+            if parts[3] == "process":
+                return self._process(sid, query)
+            if parts[3] == "verify":
+                return self._verify(sid)
+            if parts[3] == "sign":
+                return self._sign(sid)
+            if parts[3] == "addendum":
+                return self._addendum(sid)
+        if parts == ["api", "upload"]:
+            return self._upload(query)
+        return self._error(HTTPStatus.NOT_FOUND, "unknown endpoint")
 
     def _payload(self) -> dict:
-        payload = json.loads(self._body() or b"{}")
+        try:
+            payload = json.loads(self._body() or b"{}")
+        except (json.JSONDecodeError, UnicodeDecodeError, RecursionError):
+            raise BadRequest("the request body is not JSON") from None
         if not isinstance(payload, dict):
             raise BadRequest("the request body must be a JSON object")
         return payload
@@ -227,7 +330,10 @@ class Handler(BaseHTTPRequestHandler):
         template = query.get("template", ["SOAP"])[0]
         if template not in ("SOAP", "DAP"):
             return self._error(HTTPStatus.BAD_REQUEST, "template must be SOAP or DAP")
-        result = ORCH.process_session(sid, template)  # refuses a signed session
+        if not (config.SESSIONS_DIR / f"{sid}.json").is_file():
+            raise _no_session()
+        with _session_lock(sid):
+            result = ORCH.process_session(sid, template)  # refuses a signed session
         result["signature"], result["signed"], result["addenda"] = None, False, []
         return self._json(result)
 
@@ -287,7 +393,7 @@ class Handler(BaseHTTPRequestHandler):
         text, author = payload.get("text"), payload.get("author")
         if not isinstance(text, str) or not text.strip() or len(text) > 4000 or not isinstance(author, str) or not author.strip() or len(author) > 80:
             return self._error(HTTPStatus.BAD_REQUEST, "text and author are required", "請填寫補充說明的內容和姓名。")
-        load_transcript(sid)
+        _transcript(sid)
         try:
             return self._json({"addenda": store.add_addendum(sid, text.strip(), author.strip())})
         except store.NotSignedError:
@@ -297,47 +403,84 @@ class Handler(BaseHTTPRequestHandler):
         client_id = query.get("client", [""])[0]
         session_id = _session_id(query.get("session_id", [""])[0])  # upper case
         if query.get("consent", [""])[0] != "1":
-            return self._error(HTTPStatus.BAD_REQUEST, "the client's written consent to recording is required")
-        if (config.SESSIONS_DIR / f"{session_id}.json").exists():
-            return self._error(HTTPStatus.CONFLICT, "a session with this id already exists")
+            return self._error(HTTPStatus.BAD_REQUEST, "the client's written consent to recording is required",
+                               "需要先取得個案對錄音的書面同意。")
         simulated = query.get("simulated", ["1"])[0] == "1"
-        client = get_client(client_id)
+        _client(client_id)
         suffix = Path(self.headers.get("X-Filename", "audio.wav")).suffix.lower()
         if suffix not in AUDIO_SUFFIXES:
             suffix = ".wav"
-        length = int(self.headers.get("Content-Length", 0))
-        if length > MAX_UPLOAD:
-            return self._error(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "upload too large")
-        with tempfile.NamedTemporaryFile(suffix=suffix) as tmp:
-            # Streamed to the temp file, so a long recording is not held in memory.
-            while length > 0:
-                chunk = self.rfile.read(min(length, 1 << 20))
-                if not chunk:
-                    break
-                tmp.write(chunk)
-                length -= len(chunk)
-            tmp.flush()
-            try:
-                t = transcribe_audio(Path(tmp.name), session_id, client_id, len(client.get("sessions", [])) + 1, date.today().isoformat(), simulated)
-            except ImportError:
-                return self._error(HTTPStatus.NOT_IMPLEMENTED, "faster-whisper is not installed")
-            except ASRError as e:
-                return self._error(HTTPStatus.BAD_GATEWAY, f"speech-to-text server at {config.ASR_URL}: {e}")
-            except OSError:
-                return self._error(HTTPStatus.SERVICE_UNAVAILABLE, f"speech-to-text server not reachable at {config.ASR_URL}")
-        # The raw audio is never kept: the temp file is deleted on leaving the block.
-        labelled = ORCH.speakers.run(t)
-        save_transcript(t)
-        with CLIENTS_LOCK:  # two uploads at once must not drop each other's session
-            clients = load_clients()
-            for c in clients:
-                if c["id"] == client_id and session_id not in c.setdefault("sessions", []):
-                    c["sessions"].append(session_id)
-            tmp_file = config.CLIENTS_FILE.with_suffix(".tmp")
-            tmp_file.write_text(json.dumps(clients, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-            tmp_file.replace(config.CLIENTS_FILE)
+        length = self._content_length(MAX_UPLOAD)
+        if length == 0:
+            raise HttpError(HTTPStatus.BAD_REQUEST, "the upload is empty", "沒有收到錄音：檔案是空的。請重新選擇錄音檔。")
+        session_no = _reserve_upload(session_id, client_id)  # 409 when the id is taken or being uploaded
+        try:
+            with tempfile.NamedTemporaryFile(suffix=suffix) as tmp:
+                # Streamed to the temp file in 1 MB pieces, so the upload itself is not held in memory.
+                left = length
+                while left > 0:
+                    chunk = self.rfile.read(min(left, 1 << 20))
+                    if not chunk:
+                        break
+                    tmp.write(chunk)
+                    left -= len(chunk)
+                tmp.flush()
+                if left:
+                    raise HttpError(HTTPStatus.BAD_REQUEST, "the upload ended before the whole file arrived",
+                                    "上傳中斷，錄音沒有完整送達。請再上傳一次。")
+                try:
+                    t = transcribe_audio(Path(tmp.name), session_id, client_id, session_no, date.today().isoformat(), simulated)
+                except ImportError:
+                    raise HttpError(HTTPStatus.NOT_IMPLEMENTED, "faster-whisper is not installed",
+                                    "這台電腦還沒有安裝語音轉寫模組（faster-whisper）。") from None
+                except ASRError as e:
+                    raise HttpError(HTTPStatus.BAD_GATEWAY, f"speech-to-text server at {config.ASR_URL}: {e}",
+                                    "本機語音轉寫服務沒有回傳可用的逐字稿，請確認錄音檔格式後再試。") from None
+                except OSError:
+                    raise HttpError(HTTPStatus.SERVICE_UNAVAILABLE, f"speech-to-text server not reachable at {config.ASR_URL}",
+                                    "連不上本機語音轉寫服務，請確認它已經啟動。") from None
+            # The raw audio is never kept: the temp file is deleted on leaving the block.
+            if not t.segments:
+                raise HttpError(HTTPStatus.UNPROCESSABLE_ENTITY, "no speech was recognised in the recording",
+                                "錄音裡沒有辨識到任何語音，沒有建立會談。請確認錄音檔是否正確、有沒有聲音。")
+            labelled = ORCH.speakers.run(t)
+            with CLIENTS_LOCK:  # two uploads at once must not drop each other's session
+                save_transcript(t)
+                clients = load_clients()
+                for c in clients:
+                    if c["id"] == client_id and session_id not in c.setdefault("sessions", []):
+                        c["sessions"].append(session_id)
+                tmp_file = config.CLIENTS_FILE.with_suffix(".tmp")
+                tmp_file.write_text(json.dumps(clients, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                tmp_file.replace(config.CLIENTS_FILE)
+        finally:
+            with CLIENTS_LOCK:
+                UPLOADING.pop(session_id, None)
         store.audit("transcribe_upload", f"{session_id} consent={CONSENT_SCOPE} simulated={int(simulated)} asr={config.ASR_BACKEND} speakers_guessed={labelled}/{len(t.segments)}; audio deleted after ASR")
-        return self._json(ORCH.process_session(session_id))
+        with _session_lock(session_id):
+            return self._json(ORCH.process_session(session_id))
+
+
+def _reserve_upload(session_id: str, client_id: str) -> int:
+    """Claims ``session_id`` for one upload and gives it the client's next session
+    number. Both happen under one lock, so two uploads at once can neither share
+    an id (the second is refused) nor a number."""
+    with CLIENTS_LOCK:
+        client = _client(client_id)
+        taken = (config.SESSIONS_DIR / f"{session_id}.json").exists() or session_id in UPLOADING \
+            or any(session_id in c.get("sessions", []) for c in load_clients())
+        if taken:
+            raise Refused("a session with this id already exists or is being uploaded",
+                          "這個會談編號已經存在，或正在上傳中。請換一個編號。")
+        numbers = [no for cid, no in UPLOADING.values() if cid == client_id]
+        for sid in client.get("sessions", []):
+            try:
+                numbers.append(int(json.loads((config.SESSIONS_DIR / f"{sid}.json").read_text(encoding="utf-8"))["session_no"]))
+            except (OSError, ValueError, KeyError, TypeError):
+                continue
+        session_no = max(numbers, default=0) + 1
+        UPLOADING[session_id] = (client_id, session_no)
+        return session_no
 
 
 def serve() -> None:

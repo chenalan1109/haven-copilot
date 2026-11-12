@@ -79,7 +79,7 @@ def assess(measure: str, history: list[dict]) -> dict:
 
 
 class OutcomeAgent:
-    def note_sentences(self, client: dict, session_no: int) -> list[dict]:
+    def note_sentences(self, client: dict, session_no: int) -> list[str]:
         """Score lines for the note's objective section, taken from the questionnaires
         completed for this session, so the writer never has to restate numbers."""
         out = []
@@ -96,7 +96,7 @@ class OutcomeAgent:
                 text += f"，自殺想法題 {now['suicide_item']} 分"
             if measure == "PHQ9" and "item9" in now:
                 text += f"，第 9 題 {now['item9']} 分"
-            out.append({"text": text + "。", "date": now.get("date", "")})
+            out.append(text + "。")
         return out
 
     def run(self, client: dict) -> dict:

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
@@ -42,18 +43,39 @@ class NotSignedError(Exception):
 def connect():
     """One transaction on a fresh connection, closed afterwards (sqlite3's own
     context manager commits but leaves the connection open)."""
-    config.DATA_DIR.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(config.DB_FILE)
+    _prepare()
+    conn = sqlite3.connect(config.DB_FILE, timeout=30)
     try:
-        conn.executescript(SCHEMA)
-        have = {row[1] for row in conn.execute("PRAGMA table_info(signed_notes)")}
-        for column in _SIGNED_COLUMNS:
-            if column not in have:
-                conn.execute(f"ALTER TABLE signed_notes ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
         with conn:
             yield conn
     finally:
         conn.close()
+
+
+_PREPARE_LOCK = threading.Lock()
+_PREPARED: set[str] = set()
+
+
+def _prepare() -> None:
+    """Creates the tables once per database file. Doing it on every connection
+    made several first requests at once fail with "database is locked": each
+    tried to change the schema while another held the file."""
+    key = str(config.DB_FILE)
+    if key in _PREPARED and config.DB_FILE.exists():
+        return
+    with _PREPARE_LOCK:
+        config.DATA_DIR.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(config.DB_FILE, timeout=30)
+        try:
+            conn.executescript(SCHEMA)
+            have = {row[1] for row in conn.execute("PRAGMA table_info(signed_notes)")}
+            for column in _SIGNED_COLUMNS:
+                if column not in have:
+                    conn.execute(f"ALTER TABLE signed_notes ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
+            conn.commit()
+        finally:
+            conn.close()
+        _PREPARED.add(key)
 
 
 def _audit(c, action: str, detail: str) -> None:
