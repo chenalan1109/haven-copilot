@@ -62,6 +62,7 @@ flowchart LR
 Requires Python 3.10+. The core has no third-party dependencies.
 
 ```bash
+python3 scripts/reset_demo.py   # a clean, unsigned demo state (see "Demo walkthrough")
 python3 -m haven
 ```
 
@@ -94,7 +95,7 @@ python3 scripts/prepare_demo.py
 | C001-S04 | 44 s | 7 / 12 |
 | C002-S05 | 37 s | 7 / 10 |
 
-Score lines filled in from the questionnaires are not counted. What the verifier caught in these runs: "下週五" where the session said "這週五", "近兩週" attached to a statement that had no time frame, and feelings ("自責") the cited line did not contain. It also flags some correct paraphrases; the therapist clears those with "確認無誤". A 7B model on a laptop is the floor; Stage II moves to a larger model on the Arc Pro B70.
+Score lines filled in from the questionnaires are not counted. What the verifier caught in these runs: "下週五" where the session said "這週五", "近兩週" attached to a statement that had no time frame, and feelings ("自責") the cited line did not contain. It also flags some correct paraphrases; the therapist clears those with 「保留此句（我已核對）」. A 7B model on a laptop is the floor; Stage II moves to a larger model on the Arc Pro B70.
 
 ### On the Arc Pro B70 (Stage II)
 
@@ -168,7 +169,7 @@ HAVEN_LLM=openai HAVEN_MODEL=qwen3-32b-awq HAVEN_ASR=openai python3 -m haven
 
 Start Whisper first and wait for it: two servers loading at once fail each other's memory check. With Whisper loaded, 24.5 of the card's 30.3 GiB stay free, which is why the note model runs at `UTIL=0.8`.
 
-Recordings are streamed to a temp file, sent to the local server, and deleted after transcription. Then the local LLM guesses from the words who is speaking (one therapist, one client). There is no acoustic diarization yet, so the guesses are shown with "?" and treated with care:
+Recordings are streamed to a temp file, sent to the local server, and deleted after transcription. Then the local LLM guesses from the words who is speaking (one therapist, one client). There is no acoustic diarization yet, so the guesses are shown as 「（推測）」 and treated with care:
 
 - The risk agent scans every line whose speaker is guessed or unknown, and a cue keeps its level whoever the model guessed said it (「我想燒炭」 stays at the top level). Only a question addressed to 「你」 is lowered to "review" and marked as possibly the therapist asking.
 - Screening questions, safety steps and checklist items count only on lines known to be the therapist's (prepared transcripts). For an upload the panel says it cannot tell whether suicide was asked about, instead of saying it was not.
@@ -182,11 +183,29 @@ python3 -m unittest discover -s tests -v
 
 ## Demo walkthrough
 
-1. **小安** shows four outcome alerts: PHQ-9, GAD-7 and BSRS-5 are not improving after 4 sessions, and the BSRS-5 suicide item scored 2.
-2. Open **C001-S04**. The risk panel flags 「活著好累…消失算了」 (#10) as suicidal ideation, and keeps 「沒有真的想要怎麼做」 (#12) for review because it is negated. Its checklist shows the therapist asked about suicide (#11), frequency (#13), protective factors (#15) and made a safety plan (#17, #19, #20), and that access to means and past attempts were not discussed.
-3. Click any note sentence to jump to the transcript lines behind it.
-4. Red sentences show why they were flagged. Rewrite "安排下週五提前會談" as "下次會談提前到這週五。" and the verifier clears it; click **確認無誤** on a correct paraphrase. **加入測試句** inserts a sentence that is not in the transcript to show it being caught. Signing stays blocked until every red sentence is fixed, removed or confirmed, and the server checks this again itself. After signing, the page shows the signed note read-only with its hashes, and an addendum box.
-5. Ask **「哪幾次提到父親？」** to search across sessions.
+Before presenting, put the demo in a clean state. A note signed in an earlier run stays signed (that is the point of signing), so the signing step cannot be shown twice without this:
+
+```bash
+python3 scripts/reset_demo.py
+python3 -m haven
+```
+
+`reset_demo.py` moves the current database aside as `data/haven.db-backup-<time>` (nothing is deleted), starts an empty one and drafts the three demo sessions with the current engine. It refuses to run if the data directory holds a session not marked simulated.
+
+- **Without a model**, the rule engine only quotes the transcript, so every sentence passes and there is nothing red to show. The script therefore adds one wrong sentence to C001-S04's plan, 「安排下週五提前會談。」 citing line #19, where the therapist says 這週五. The session page says in a banner that the sentence was planted for the demonstration, and the audit log records it. It is the error qwen2.5:7b made in the first recorded demo. `--no-example` leaves it out.
+- **With a model**, nothing is planted: the model's own flagged sentences are the demonstration, and they differ from run to run.
+- `--from <file>` starts from a database prepared earlier instead of an empty one, with its signatures removed, for example a local `data/haven.demo.db` made with `scripts/prepare_demo.py` while a model was running. That file is not in the repository (databases are ignored by git). Its drafts are re-checked under the current rules, and paraphrased sentences pass only if the same model is running to check them.
+
+Then:
+
+1. **小安** shows five outcome reminders: PHQ-9, GAD-7 and BSRS-5 have not improved reliably after 4 sessions, PHQ-9 item 9 scored 1, and the BSRS-5 suicide item scored 2.
+2. Open **第 4 次** (C001-S04). The risk panel groups cues by category: 「活著好累…消失算了」 (#10) under suicidal ideation, and 「沒有真的想要怎麼做」 (#12) kept for review because it is negated. Its checklist shows the therapist asked about suicide (#11), frequency (#13), protective factors (#15) and proposed a safety plan (#17, #19, #20), and that access to means and past attempts were not discussed.
+3. Click the segment number beside any note sentence to mark the transcript lines behind it. Only the transcript column scrolls.
+4. The counter above the note reads 「AI 草稿 14 句｜✓ 13 句有逐字稿支持｜✗ 1 句未能證實｜1 句被攔下，擋住簽核」, and the red sentence shows why: 時間詞「下週」不在引用的逐字稿中. Rewrite it as 「下次會談提前到這週五。」. An edited sentence is marked 「已修改，尚未驗證」 and signing is disabled until it has been verified again, which happens when you leave the box or press 重新驗證. **示範：插入捏造句** adds a sentence that is not in the transcript to show it being caught; remove it with **刪除**, or keep a flagged sentence with **保留此句（我已核對）**. **＋ 新增句子** adds a sentence of your own; it cites no transcript line, so it has to be kept explicitly.
+5. **核對完成，簽核** opens a dialog that lists the flagged sentences you kept and the risk cues you left out, and asks for your name and a tick on 「我已逐句核對」. The server checks the whole note again. After signing, the page shows the signed note read-only with its hashes and an addendum box.
+6. Back on the client page, ask **「哪幾次提到父親？」** to search across sessions.
+
+Leaving a session with unsigned edits asks first: a draft's edits live in the page until it is signed (there is no saved draft yet).
 
 ## Configuration
 

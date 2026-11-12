@@ -8,52 +8,99 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">Haven <span>心港</span></div>
-    <div class="status" id="status">連線中…</div>
+    <div class="brand-block">
+      <div class="brand"><span lang="en">Haven</span> <span class="zh">心港</span></div>
+      <p class="tagline">心理師的本機 AI 紀錄助理：會談錄音 → 每句都引用逐字稿的紀錄草稿 → 風險線索提示 → 心理師核對後簽核</p>
+    </div>
+    <div class="status" id="status" role="status" aria-live="polite">連線中…</div>
   </header>
+  <ol class="stepper" id="stepper" aria-label="使用流程">
+    <li data-step="1">會談前摘要</li>
+    <li data-step="2">逐字稿與風險線索</li>
+    <li data-step="3">逐句查核與修改</li>
+    <li data-step="4">心理師簽核</li>
+  </ol>
+  <div id="toast" class="toast" role="alert" aria-live="assertive" hidden>
+    <span id="toast-text"></span>
+    <button type="button" id="toast-close" aria-label="關閉訊息">關閉</button>
+  </div>
   <div class="layout">
     <aside class="sidebar">
-      <h2>個案 <small>Clients</small></h2>
+      <h2>個案 <small lang="en">Clients</small></h2>
       <ul id="client-list"></ul>
-      <p class="sim-note">所有資料皆為模擬會談，非真實個案。<br>Simulated sessions only.</p>
+      <p class="sim-note" id="sim-note" role="status" aria-live="polite">選擇個案後，這裡會顯示資料是模擬會談還是真實個案。</p>
     </aside>
     <main id="main">
       <div class="empty">選擇左側個案開始。</div>
     </main>
   </div>
+
+  <dialog id="sign-dialog" aria-labelledby="sign-title">
+    <form method="dialog" id="sign-form">
+      <h3 id="sign-title">簽核這份紀錄</h3>
+      <p id="sign-summary"></p>
+      <div id="sign-kept"></div>
+      <label class="field"><span>簽核心理師姓名</span>
+        <input type="text" name="signed_by" required maxlength="80" autocomplete="off"></label>
+      <label class="check"><input type="checkbox" name="checked" required> 我已逐句核對這份紀錄與逐字稿，內容由我負責。</label>
+      <p class="dialog-note">簽核後紀錄不能再修改，只能新增補充說明。</p>
+      <p class="problem" id="sign-error" role="alert"></p>
+      <div class="dialog-actions">
+        <button type="button" id="sign-cancel">取消</button>
+        <button type="submit" class="primary" id="sign-confirm">簽核</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="reason-dialog" aria-labelledby="reason-title">
+    <form method="dialog" id="reason-form">
+      <h3 id="reason-title">不納入紀錄的理由</h3>
+      <p id="reason-quote"></p>
+      <label class="field"><span>理由（會寫入稽核紀錄）</span>
+        <textarea name="reason" rows="3" required minlength="2" maxlength="500"></textarea></label>
+      <div class="dialog-actions">
+        <button type="button" id="reason-cancel">取消</button>
+        <button type="submit" class="primary">確定</button>
+      </div>
+    </form>
+  </dialog>
+
   <template id="tpl-client">
     <section class="card brief">
       <div class="card-head">
-        <h1 class="client-name"></h1>
+        <h1 class="client-name" tabindex="-1"></h1>
         <span class="concern"></span>
       </div>
-      <h3>會談前摘要 <small>Pre-session brief</small></h3>
+      <h3>會談前摘要 <small lang="en">Pre-session brief</small></h3>
       <div class="alerts"></div>
       <div class="charts"></div>
       <div class="last-plan"></div>
     </section>
     <section class="card">
-      <h3>會談 <small>Sessions</small></h3>
+      <h3>會談 <small lang="en">Sessions</small></h3>
       <div class="session-buttons"></div>
       <details class="upload">
         <summary>上傳會談錄音（本機轉寫；Haven 不保存錄音，暫存檔轉寫後刪除）</summary>
         <form class="upload-form">
-          <input type="text" name="session_id" placeholder="會談編號，例如 C001-S05" required pattern="[A-Za-z0-9-]{1,40}">
-          <input type="file" name="audio" accept="audio/*" required>
-          <label><input type="checkbox" name="consent" required> 已取得個案書面同意：錄音、本機 AI 轉寫與說話者推測、逐字稿保存</label>
-          <label><input type="checkbox" name="simulated"> 模擬會談（非真實個案）</label>
+          <label class="field"><span>會談編號</span>
+            <input type="text" name="session_id" placeholder="例如 C001-S05" required pattern="[A-Za-z0-9\-]{1,40}"></label>
+          <label class="field"><span>錄音檔</span>
+            <input type="file" name="audio" accept="audio/*" required></label>
+          <label class="check"><input type="checkbox" name="consent" required> 已取得個案書面同意：錄音、本機 AI 轉寫與說話者推測、逐字稿保存</label>
+          <label class="check"><input type="checkbox" name="simulated"> 這是模擬會談（非真實個案）。不勾選就當作真實個案資料。</label>
           <button type="submit">轉寫並產生紀錄</button>
         </form>
-        <p class="upload-msg"></p>
+        <p class="upload-msg" role="status" aria-live="polite"></p>
       </details>
     </section>
     <section class="card">
-      <h3>個案問答 <small>Ask about this client</small></h3>
+      <h3>個案問答 <small lang="en">Ask about this client</small></h3>
       <form class="ask-form">
-        <input type="text" name="q" placeholder="例如：哪幾次提到父親？" required>
+        <label class="sr-only" for="ask-q">想查的內容</label>
+        <input type="text" id="ask-q" name="q" placeholder="例如：哪幾次提到父親？" required maxlength="500">
         <button type="submit">查詢</button>
       </form>
-      <div class="ask-result"></div>
+      <div class="ask-result" role="status" aria-live="polite"></div>
     </section>
   </template>
   <script src="app.js"></script>

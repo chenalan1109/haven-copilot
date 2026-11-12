@@ -2,6 +2,8 @@
 
 English voice-over over the deck and a screen recording. The demo includes a short clip of the simulated session in Chinese with English subtitles. About 400 words of narration at ~140 words per minute, plus a 25-second clip, comes to about 2:55.
 
+> This is the Stage I script (October 2026), kept as recorded. The UI has changed since: the status bar, button labels and the signing dialog differ, and `python3 scripts/reset_demo.py --from data/haven.demo.db` now does the restore step below. See the README's "Demo walkthrough" for the current steps.
+
 **Before recording**
 - Restore the demo data: `cp data/haven.demo.db data/haven.db`. This also clears practice signatures. Do it again after every practice run.
 - **Don't** re-run `scripts/prepare_demo.py`. The stored C001-S04 note contains the 「安排下週五提前會談」 error the demo needs, and a fresh run may not reproduce it.
@@ -62,7 +64,7 @@ After the session, the risk agent flags that line with the exact quote. "No plan
 2. Scroll to the red sentence 「安排下週五提前會談。」 with the reason 時間詞「下週」不在引用的逐字稿中.
 3. Click it so transcript line #19 shows: 「我們下次提前到這週五再見一次」.
 4. Replace the whole sentence with **「下次會談提前到這週五。」**, then click 重新驗證. It turns green. It passes on word overlap alone, so the result doesn't depend on the model.
-5. Click 確認無誤 on the remaining red sentences, then click 確認並簽核.
+5. Click 保留此句（我已核對） on the remaining flagged sentences, then click 核對完成，簽核, tick 我已逐句核對 in the dialog and confirm.
 
 **Subtitle for the #19 line:** "Let's move our next session up to this Friday."
 

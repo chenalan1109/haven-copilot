@@ -175,6 +175,11 @@ def _session_view(sid: str) -> dict:
     store.audit("read_session", f"{sid}{' (signed)' if signature else ''}")
     result["signature"] = signature
     result["signed"] = bool(signature)
+    try:  # for the page heading and the signing dialog; the record itself does not depend on it
+        client = get_client(result["client_id"])
+        result["client_alias"], result["therapist"] = client.get("alias", ""), client.get("therapist", "")
+    except KeyError:
+        result["client_alias"], result["therapist"] = "", ""
     result["addenda"] = store.get_addenda(sid) if signature else []
     if signature:
         note = store.get_signed_note(sid)

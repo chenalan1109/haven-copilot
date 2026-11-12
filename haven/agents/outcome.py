@@ -68,6 +68,7 @@ def assess(measure: str, history: list[dict]) -> dict:
         "measure": measure,
         "name": spec["name"],
         "max": spec["max"],
+        "clinical_cutoff": spec["clinical_cutoff"],
         "history": history,
         "baseline": baseline,
         "latest": latest,

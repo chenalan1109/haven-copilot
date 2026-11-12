@@ -129,6 +129,24 @@ class Orchestrator:
         store.audit("reverify_stored_draft", f"{session_id} verifier={VERIFIER_VERSION}")
         return result
 
+    def sessions_meta(self, client: dict) -> list[dict]:
+        """One line per session for the client page: when it was, whether it is
+        simulated, and how far its note has got. Read from files and the store only."""
+        out = []
+        for session_id in client.get("sessions", []):
+            try:
+                t = load_transcript(session_id)
+            except (OSError, ValueError, KeyError, TypeError):
+                out.append({"session_id": session_id, "missing": True})
+                continue
+            result = store.get_result(session_id)
+            out.append({
+                "session_id": session_id, "session_no": t.session_no, "date": t.date, "simulated": t.simulated,
+                "processed": result is not None, "signed": store.get_signature(session_id) is not None,
+                "risk_level": result["risk"]["level"] if result else None,
+            })
+        return out
+
     def brief(self, client_id: str) -> dict:
         """Pre-session brief: last plan, last risk picture, outcome alerts."""
         client = get_client(client_id)
@@ -156,6 +174,7 @@ class Orchestrator:
                 "risk_level": last["risk"]["level"],
             },
             "plan": plan,
+            "sessions_meta": self.sessions_meta(client),
             # Sessions after ``last_session`` with no note yet; the brief does not cover them.
             "not_processed": not_processed,
             "outcome": self.outcome.run(client),
