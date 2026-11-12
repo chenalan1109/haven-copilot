@@ -62,6 +62,7 @@ class Orchestrator:
 
         transcript = timed("asr", load_transcript, session_id)
         client = get_client(transcript.client_id)
+        transcript.client_age = client.get("age")
         note = timed("writer", self.writer.run, transcript, template)
         # Scores go into the objective section from the questionnaire data itself,
         # so the model never restates (and never misstates) a number.
@@ -103,7 +104,9 @@ class Orchestrator:
         scanned again."""
         session_id = result["session_id"]
         transcript = load_transcript(session_id)
-        measures = self.measure_sentences(get_client(transcript.client_id), transcript.session_no)
+        client = get_client(transcript.client_id)
+        transcript.client_age = client.get("age")
+        measures = self.measure_sentences(client, transcript.session_no)
         stored = result["note"]
         note = Note(stored["template"], {
             k: [NoteSentence(s["text"], list(s.get("evidence", [])), source="measure" if s["text"] in measures and not s.get("evidence") else "transcript")

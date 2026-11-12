@@ -68,7 +68,9 @@ def _draft(sid: str) -> tuple[dict, object, list[str]]:
     result = store.get_result(sid)
     if result is None:
         raise Refused("no draft has been produced for this session yet", "這次會談還沒有產生紀錄草稿，請先開啟會談。")
-    measures = ORCH.measure_sentences(get_client(transcript.client_id), transcript.session_no)
+    client = get_client(transcript.client_id)
+    transcript.client_age = client.get("age")
+    measures = ORCH.measure_sentences(client, transcript.session_no)
     return result, transcript, measures
 
 

@@ -25,6 +25,9 @@ class Transcript:
     date: str
     segments: list[Segment]
     simulated: bool = True
+    # From the client file, when known. The risk agent uses it for cues that
+    # matter differently for a minor (substance use, abuse).
+    client_age: int | None = None
 
     def by_id(self) -> dict[int, Segment]:
         return {s.id: s for s in self.segments}
@@ -73,6 +76,12 @@ class RiskFlag:
     negated: bool = False
     # True when the line's speaker was guessed by the model, not confirmed.
     speaker_unconfirmed: bool = False
+    # What the therapist should consider for this cue, e.g. the reporting duty to assess.
+    note: str = ""
+    # An unconfirmed speaker's question with "你": likely the therapist asking, so kept at review.
+    maybe_therapist: bool = False
+    # A known therapist line restating what the client disclosed.
+    therapist_reflection: bool = False
 
 
 @dataclass
@@ -84,6 +93,9 @@ class RiskReport:
     safety_actions: list[int] = field(default_factory=list)
     # Filled only when suicide or self-harm cues are present.
     checklist: list[dict] = field(default_factory=list)
+    # False for uploaded audio with no confirmed therapist lines: whether the
+    # therapist asked about suicide cannot be told from the transcript.
+    speakers_confirmed: bool = True
 
 
 def to_dict(obj) -> dict:

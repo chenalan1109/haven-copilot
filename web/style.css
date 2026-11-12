@@ -114,6 +114,8 @@ main { padding: 20px; min-width: 0; }
 .risk-panel { border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
 .risk-panel.lvl-none { background: var(--good-soft); }
 .risk-panel.lvl-review { background: var(--warn-soft); }
+.risk-panel.lvl-info { background: var(--accent-soft); }
+.flag-note { font-size: 12px; color: var(--muted); margin: 2px 0 2px 4px; }
 .risk-panel.lvl-high, .risk-panel.lvl-critical { background: var(--bad-soft); }
 .risk-panel h4 { margin: 0 0 6px; font-size: 14px; }
 .risk-panel .disclaimer { font-size: 12px; color: var(--muted); }

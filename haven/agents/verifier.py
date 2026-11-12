@@ -34,7 +34,7 @@ SUPPORTED = 0.5
 WEAK = 0.25
 # Stored with every signed note and with the cached verdicts. Change it whenever
 # a rule changes, so a verdict from older rules is never reused.
-VERIFIER_VERSION = "2026.11-2"
+VERIFIER_VERSION = "2026.11-3"
 MEASURE_MISMATCH = "量表句與系統依量表資料產生的內容不符。量表句不可修改：請還原，或改寫成引用逐字稿的句子"
 
 _TIME = re.compile(r"這週|下週|上週|本週|今天|明天|昨天|下次|上次|每天|每週|週[一二三四五六日]")
@@ -156,7 +156,7 @@ class Verifier:
         measures = set(measures)
         # Segments carrying a risk cue (anything but a functioning cue): a weak
         # sentence citing one waits for the therapist whatever words it uses.
-        risky = {f.segment_id for f in risk_agent.RiskAgent().run(t).flags if f.category != "嚴重失功能"}
+        risky = {f.segment_id for f in risk_agent.RiskAgent().run(t).flags if f.category != risk_agent.FUNCTIONING}
         warnings: list[str] = []
         llm_failed = False
 

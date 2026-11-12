@@ -11,7 +11,10 @@ const SECTION_HINTS = {
   R: "逐字稿中的風險線索、保護因子與安全措施；不受句數限制。提議而未完成的安全計畫會寫成「心理師提議」。",
 };
 // Describes the cues found in the transcript, not the client's risk level.
-const RISK_NAMES = { none: "未偵測到風險線索", review: "有需留意的線索", high: "有自殺或自傷等高關注線索", critical: "提及計畫或工具" };
+const RISK_NAMES = {
+  none: "未偵測到風險線索", info: "有背景線索（非個案本人的意念）", review: "有需留意的線索", high: "有自殺或自傷等高關注線索",
+  critical: "有需優先確認的線索（計畫或工具、自殺行為、傷害他人或通報義務）",
+};
 const STATUS_NAMES = { supported: "用字與引用段落相符", weak: "支持不足", unsupported: "無支持證據" };
 const AGENT_NAMES = { asr: "轉寫", writer: "紀錄", verifier: "驗證", risk: "風險", outcome: "成效" };
 
@@ -155,7 +158,7 @@ async function openClient(id) {
   if (brief.last_session) {
     const ls = brief.last_session;
     frag.querySelector(".last-plan").append(
-      el("div", {}, `上次會談：第 ${ls.session_no} 次（${ls.date}），風險線索：${RISK_NAMES[ls.risk_level]}`),
+      el("div", {}, `上次會談：第 ${ls.session_no} 次（${ls.date}），風險線索：${RISK_NAMES[ls.risk_level] || ls.risk_level}`),
       brief.plan.length ? el("ul", {}, brief.plan.map((p) => el("li", {}, p))) : null,
     );
   }
@@ -365,22 +368,28 @@ function renderSession(r, focusSeg) {
 
   const risk = r.risk;
   const riskPanel = el("div", { class: `risk-panel lvl-${risk.level}` },
-    el("h4", {}, `風險線索：${RISK_NAMES[risk.level]}`),
+    el("h4", {}, `風險線索：${RISK_NAMES[risk.level] || risk.level}`),
+    risk.flags.some((f) => f.speaker_unconfirmed) ? el("div", { class: "flag-note" }, "含說話者未確認的線索") : null,
     risk.flags.map((f) => el("div", { class: "flag", onclick: () => highlight([f.segment_id]) },
       el("b", {}, `[${f.category}]`), `#${f.segment_id}「${f.quote}」`, f.negated ? "（含否定語，請確認）" : "",
-      f.speaker_unconfirmed ? "（說話者未確認，可能是心理師的提問）" : "")),
+      // Only a question with 你 from an unconfirmed speaker is likely the therapist asking.
+      f.maybe_therapist ? "（說話者未確認，可能是心理師的提問）" : f.speaker_unconfirmed ? "（說話者由模型推測，請對照錄音）" : "",
+      f.note ? el("div", { class: "flag-note" }, f.note) : null)),
     risk.protective.length ? el("div", { class: "flag" }, el("b", {}, "[保護因子]"),
       risk.protective.map((p) => `#${p.segment_id}「${p.quote}」`).join(" ")) : null,
     risk.flags.length ? el("div", { class: "checks" },
-      el("span", {}, risk.screening_asked.length ? `✓ 逐字稿出現自殺意念詢問用語（#${risk.screening_asked.join(", #")}）` : "✗ 逐字稿中未見自殺意念詢問"),
-      el("span", {}, risk.safety_actions.length ? `✓ 逐字稿出現安全計畫或轉介用語（#${risk.safety_actions.join(", #")}）` : "✗ 未見安全計畫或轉介"),
+      // With uploaded audio nobody is confirmed as the therapist, so "not asked" cannot be claimed.
+      el("span", {}, risk.screening_asked.length ? `✓ 逐字稿出現自殺意念詢問用語（#${risk.screening_asked.join(", #")}）`
+        : risk.speakers_confirmed === false ? "— 說話者未確認，無法判斷是否已詢問自殺意念（請自行核對）" : "✗ 逐字稿中未見自殺意念詢問"),
+      el("span", {}, risk.safety_actions.length ? `✓ 逐字稿出現安全計畫或轉介用語（#${risk.safety_actions.join(", #")}）`
+        : risk.speakers_confirmed === false ? "— 說話者未確認，無法判斷是否談到安全計畫或轉介（請自行核對）" : "✗ 未見安全計畫或轉介"),
     ) : null,
     risk.checklist.length ? el("div", { class: "checklist" },
       el("div", { class: "checklist-title" }, "自殺風險評估要素（關鍵詞比對，只看是否談到，無法評估評估品質）"),
       risk.checklist.map((c) => el("span", { class: c.covered.length ? "done" : "missing" },
         c.covered.length ? `✓ ${c.item}（#${c.covered.join(", #")}）` : `○ ${c.item}：可考慮補問或補記`)),
     ) : null,
-    el("div", { class: "disclaimer" }, "提示僅供參考，不取代心理師的臨床判斷；未標示不代表沒有風險。上傳錄音的說話者由模型推測，只有逐字稿標示的心理師用語才計入詢問與安全措施。"),
+    el("div", { class: "disclaimer" }, "提示僅供參考，不取代心理師的臨床判斷；未標示不代表沒有風險。線索來自關鍵詞比對，詞表尚待心理師確認，間接的說法仍可能漏掉。通報義務線索只提醒依法評估，系統不會自動通報。上傳錄音的說話者由模型推測，只有逐字稿標示的心理師用語才計入詢問與安全措施。"),
   );
 
   const noteBox = el("div", {});
