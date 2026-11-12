@@ -1,11 +1,21 @@
 """Local SQLite store for pipeline results, signed notes and an audit log.
 
-The file is not encrypted yet; SQLCipher is planned (see README, Stage II).
+The file is NOT encrypted. It is created with mode 0600 (this account only);
+SQLCipher is planned and not built (README, Limitations). Use full-disk
+encryption on the machine.
+
+The audit log is a hash chain: each row stores the hash of the row before it,
+so changing or deleting a row in the middle is detected by ``verify_audit``.
+It is not tamper-proof: someone who can write the file can rebuild the whole
+chain, or cut rows off the end. Comparing the head hash with a copy kept
+elsewhere detects that.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import sqlite3
 import threading
 from contextlib import contextmanager
@@ -25,6 +35,8 @@ CREATE TABLE IF NOT EXISTS verdicts (
 """
 # Columns added to signed_notes after the first release; older databases get them on first use.
 _SIGNED_COLUMNS = ("transcript_sha256", "note_sha256", "verifier_version")
+_AUDIT_COLUMNS = ("prev_hash", "hash")
+GENESIS = "0" * 64
 
 
 def _now() -> str:
@@ -72,14 +84,52 @@ def _prepare() -> None:
             for column in _SIGNED_COLUMNS:
                 if column not in have:
                     conn.execute(f"ALTER TABLE signed_notes ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
+            have = {row[1] for row in conn.execute("PRAGMA table_info(audit_log)")}
+            for column in _AUDIT_COLUMNS:
+                if column not in have:
+                    conn.execute(f"ALTER TABLE audit_log ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
+            # Rows written before the chain existed join it now, in order.
+            prev = GENESIS
+            for row_id, ts, action, detail, stored in conn.execute("SELECT id, ts, action, detail, hash FROM audit_log ORDER BY id").fetchall():
+                if not stored:
+                    stored = _row_hash(prev, ts, action, detail)
+                    conn.execute("UPDATE audit_log SET prev_hash = ?, hash = ? WHERE id = ?", (prev, stored, row_id))
+                prev = stored
             conn.commit()
         finally:
             conn.close()
+        os.chmod(config.DB_FILE, 0o600)
         _PREPARED.add(key)
 
 
+def _row_hash(prev: str, ts: str, action: str, detail: str) -> str:
+    return hashlib.sha256(json.dumps([prev, ts, action, detail], ensure_ascii=False).encode()).hexdigest()
+
+
 def _audit(c, action: str, detail: str) -> None:
-    c.execute("INSERT INTO audit_log (ts, action, detail) VALUES (?, ?, ?)", (_now(), action, detail))
+    if not c.in_transaction:
+        # Take the write lock before reading the last hash, so two writers
+        # cannot both chain onto the same row.
+        c.execute("BEGIN IMMEDIATE")
+    last = c.execute("SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1").fetchone()
+    prev, ts = (last[0] if last else GENESIS), _now()
+    c.execute("INSERT INTO audit_log (ts, action, detail, prev_hash, hash) VALUES (?, ?, ?, ?, ?)",
+              (ts, action, detail, prev, _row_hash(prev, ts, action, detail)))
+
+
+def verify_audit() -> dict:
+    """Walks the chain. ``ok`` is False at the first row whose content no longer
+    matches its hash, or whose link to the row before it is broken (a row was
+    changed, inserted or deleted). ``head`` is the last hash: keep a copy
+    outside this machine to detect a rebuilt chain or rows cut off the end."""
+    with connect() as c:
+        rows = c.execute("SELECT id, ts, action, detail, prev_hash, hash FROM audit_log ORDER BY id").fetchall()
+    prev, last_id = GENESIS, 0
+    for row_id, ts, action, detail, prev_hash, stored in rows:
+        if prev_hash != prev or stored != _row_hash(prev, ts, action, detail) or (last_id and row_id != last_id + 1):
+            return {"ok": False, "rows": len(rows), "first_bad_id": row_id, "head": None}
+        prev, last_id = stored, row_id
+    return {"ok": True, "rows": len(rows), "first_bad_id": None, "head": prev if rows else None}
 
 
 def audit(action: str, detail: str) -> None:
@@ -184,5 +234,5 @@ def get_verdicts(session_id: str, transcript_sha256: str, verifier_version: str)
 
 def recent_audit(limit: int = 20) -> list[dict]:
     with connect() as c:
-        rows = c.execute("SELECT ts, action, detail FROM audit_log ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
-    return [{"ts": r[0], "action": r[1], "detail": r[2]} for r in rows]
+        rows = c.execute("SELECT ts, action, detail, id, hash FROM audit_log ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+    return [{"ts": r[0], "action": r[1], "detail": r[2], "id": r[3], "hash": r[4]} for r in rows]

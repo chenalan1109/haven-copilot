@@ -104,7 +104,7 @@ class OpenAITranscriptionTest(unittest.TestCase):
 class SpeakerAgentTest(unittest.TestCase):
     def test_labels_unknown_segments_as_guesses(self):
         class LLM:
-            def generate_json(self, system, prompt):
+            def generate_json(self, system, prompt, max_tokens=None):
                 return {"speakers": [{"id": 1, "speaker": "therapist"}, {"id": 2, "speaker": "client"}, {"id": 3, "speaker": "narrator"}]}
         t = _transcript("這週過得怎麼樣？", "不太好，睡不著。", "嗯。")
         self.assertEqual(SpeakerAgent(LLM()).run(t), 2)
@@ -118,7 +118,7 @@ class SpeakerAgentTest(unittest.TestCase):
 
     def test_bad_model_output_is_ignored(self):
         class LLM:
-            def generate_json(self, system, prompt):
+            def generate_json(self, system, prompt, max_tokens=None):
                 return {"speakers": "therapist"}
         t = _transcript("這週過得怎麼樣？")
         self.assertEqual(SpeakerAgent(LLM()).run(t), 0)

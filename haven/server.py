@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
 import re
 import sys
 import tempfile
@@ -15,7 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import config, signing, store
+from . import config, files, llm, signing, store
 from .agents.verifier import VERIFIER_VERSION, Verifier
 from .models import to_dict
 from .orchestrator import Orchestrator, get_client, load_clients
@@ -38,10 +39,21 @@ CLIENTS_LOCK = threading.Lock()
 UPLOADING: dict[str, tuple[str, int]] = {}
 _LOCKS_GUARD = threading.Lock()
 _SESSION_LOCKS: dict[str, threading.Lock] = {}
-# Sent by the UI on every POST. A cross-site page cannot add a custom header
-# without a CORS preflight, which this server never approves, so another
-# website open in the therapist's browser cannot sign or upload.
+# Sent by the UI on every API request, GET included. A cross-site page cannot
+# add a custom header without a CORS preflight, which this server never
+# approves, so another website open in the therapist's browser cannot sign,
+# upload, start the model or write to the audit log (not even with an <img>).
 CSRF_HEADER = "X-Haven"
+# On every response. The UI has no inline script or style and loads nothing
+# from another origin, so the policy can be strict; the page cannot be framed.
+SECURITY_HEADERS = {
+    "Content-Security-Policy": "default-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+    "X-Frame-Options": "DENY",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Resource-Policy": "same-origin",
+}
 
 
 def _allowed_hosts() -> set[str]:
@@ -126,25 +138,41 @@ def _draft(sid: str) -> tuple[dict, object, list[str]]:
     return result, transcript, measures
 
 
-def _session_view(sid: str) -> dict:
-    """What the session page shows. Once signed, that is the signed note, not the draft."""
+def _stale(result: dict) -> bool:
+    return result.get("verification", {}).get("verifier_version") != VERIFIER_VERSION
+
+
+def _open_session(sid: str) -> dict:
+    """Drafts the note when the session has none, re-checks a draft made under
+    older verifier rules, and returns the session page. This writes, so it is
+    reached by POST only."""
     if not (config.SESSIONS_DIR / f"{sid}.json").is_file():
         raise _no_session()
-    signature = store.get_signature(sid)
-
-    def stale(r):
-        return not signature and r.get("verification", {}).get("verifier_version") != VERIFIER_VERSION
-
+    signed = bool(store.get_signature(sid))
     result = store.get_result(sid)
-    if result is None or stale(result):
+    if result is None or (not signed and _stale(result)):
         # One pipeline run per session: of several requests opening a session for
         # the first time, one drafts the note and the others wait and read it.
         with _session_lock(sid):
             result = store.get_result(sid)
             if result is None:
-                result = ORCH.process_session(sid)
-            elif stale(result):
-                result = ORCH.refresh(result)  # a draft checked under older rules
+                ORCH.process_session(sid)
+            elif not signed and _stale(result):
+                ORCH.refresh(result)  # a draft checked under older rules
+    return _session_view(sid)
+
+
+def _session_view(sid: str) -> dict:
+    """What the session page shows, read from the store and nothing else. Once
+    signed, that is the signed note, not the draft."""
+    if not (config.SESSIONS_DIR / f"{sid}.json").is_file():
+        raise _no_session()
+    result = store.get_result(sid)
+    if result is None:
+        raise Refused("no draft has been produced for this session yet; POST /api/sessions/<id>/open drafts it",
+                      "這次會談還沒有產生紀錄草稿。", needs_processing=True)
+    signature = store.get_signature(sid)
+    store.audit("read_session", f"{sid}{' (signed)' if signature else ''}")
     result["signature"] = signature
     result["signed"] = bool(signature)
     result["addenda"] = store.get_addenda(sid) if signature else []
@@ -155,8 +183,29 @@ def _session_view(sid: str) -> dict:
         result["risk_dismissals"] = note.get("risk_dismissals", [])
         result["risk_uncovered"] = []
     else:
+        result["needs_refresh"] = _stale(result)
         result.setdefault("risk_uncovered", signing.uncovered_risk(result["risk"], result["note"]))
     return result
+
+
+def _status() -> dict:
+    """What this process is set up to talk to, looked up now. No figure here is a
+    constant: the addresses are what the endpoint names resolve to at this moment,
+    and the counter is the number of connections Haven's own check refused."""
+    asr = None
+    if config.ASR_BACKEND == "openai":
+        asr = dict(llm.describe(config.ASR_URL), model=config.ASR_MODEL)
+    return {
+        "engine": ORCH.engine,
+        "bind": f"{config.HOST}:{config.PORT}",
+        "bind_loopback": config.HOST in ("127.0.0.1", "localhost", "::1"),
+        "llm": dict(llm.describe(ORCH.llm.url), model=ORCH.llm.model) if ORCH.llm else None,
+        "asr_backend": config.ASR_BACKEND,
+        "asr": asr,  # None: Whisper runs inside this process
+        "refused_connections": len(llm.REFUSED),
+        # Said plainly so nobody reads the page as a measurement of network traffic.
+        "note": "addresses are resolved now; refused_connections counts refusals by Haven's endpoint check since start; this is not a packet capture, and it cannot see what the model server itself connects to",
+    }
 
 
 def _client_summary(c: dict) -> dict:
@@ -176,6 +225,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def log_message(self, fmt, *args):  # keep transcripts out of console logs
         pass
+
+    def end_headers(self):
+        for name, value in SECURITY_HEADERS.items():
+            self.send_header(name, value)
+        super().end_headers()
 
     def _json(self, payload, status=HTTPStatus.OK):
         body = json.dumps(payload, ensure_ascii=False).encode()
@@ -265,29 +319,28 @@ class Handler(BaseHTTPRequestHandler):
         query = parse_qs(url.query)
         if parts[:1] != ["api"]:
             return self._static(url.path)
+        # Every API request carries the header, reads included: a read of a clinical
+        # record is written to the audit log, and a cross-site <img> must not be
+        # able to do that.
+        if self.headers.get(CSRF_HEADER) != "1":
+            return self._error(HTTPStatus.FORBIDDEN, f"missing {CSRF_HEADER} header")
+        # GET only reads. Drafting a note, re-checking one and asking the model are POSTs.
         if parts == ["api", "status"]:
-            return self._json({
-                "engine": ORCH.engine,
-                "bind": f"{config.HOST}:{config.PORT}",
-                "llm_endpoint": ORCH.llm.url if ORCH.llm else None,
-                "cloud_calls": 0,
-            })
+            return self._json(_status())
         if parts == ["api", "clients"]:
+            store.audit("list_clients", "")
             return self._json([_client_summary(c) for c in load_clients()])
         if len(parts) == 4 and parts[1] == "clients" and parts[3] == "brief":
-            _client(parts[2])
-            return self._json(ORCH.brief(parts[2]))
-        if len(parts) == 4 and parts[1] == "clients" and parts[3] == "ask":
-            q = query.get("q", [""])[0].strip()
-            if not q:
-                raise BadRequest("q is required")
-            client = _client(parts[2])  # an unknown client is a 404 and leaves no audit row
-            store.audit("ask", client["id"])
-            return self._json(ORCH.memory.ask(client, q))
+            client = _client(parts[2])
+            store.audit("read_brief", client["id"])
+            return self._json(ORCH.brief(client["id"]))
         if len(parts) == 3 and parts[1] == "sessions":
             return self._json(_session_view(_session_id(parts[2])))
         if parts == ["api", "audit"]:
+            store.audit("read_audit", "")
             return self._json(store.recent_audit())
+        if parts == ["api", "audit", "verify"]:
+            return self._json(store.verify_audit())
         return self._error(HTTPStatus.NOT_FOUND, "unknown endpoint")
 
     def do_POST(self):
@@ -305,6 +358,8 @@ class Handler(BaseHTTPRequestHandler):
         query = parse_qs(url.query)
         if len(parts) == 4 and parts[1] == "sessions":
             sid = _session_id(parts[2])
+            if parts[3] == "open":
+                return self._json(_open_session(sid))
             if parts[3] == "process":
                 return self._process(sid, query)
             if parts[3] == "verify":
@@ -313,6 +368,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._sign(sid)
             if parts[3] == "addendum":
                 return self._addendum(sid)
+        if len(parts) == 4 and parts[1] == "clients" and parts[3] == "ask":
+            return self._ask(parts[2])
         if parts == ["api", "upload"]:
             return self._upload(query)
         return self._error(HTTPStatus.NOT_FOUND, "unknown endpoint")
@@ -326,6 +383,15 @@ class Handler(BaseHTTPRequestHandler):
             raise BadRequest("the request body must be a JSON object")
         return payload
 
+    def _ask(self, client_id):
+        """The question travels in the body, not the URL: it can name what a client said."""
+        q = self._payload().get("q")
+        if not isinstance(q, str) or not q.strip() or len(q) > 500:
+            raise BadRequest("q is required")
+        client = _client(client_id)  # an unknown client is a 404 and leaves no audit row
+        store.audit("ask", client["id"])
+        return self._json(ORCH.memory.ask(client, q.strip()))
+
     def _process(self, sid, query):
         template = query.get("template", ["SOAP"])[0]
         if template not in ("SOAP", "DAP"):
@@ -333,9 +399,8 @@ class Handler(BaseHTTPRequestHandler):
         if not (config.SESSIONS_DIR / f"{sid}.json").is_file():
             raise _no_session()
         with _session_lock(sid):
-            result = ORCH.process_session(sid, template)  # refuses a signed session
-        result["signature"], result["signed"], result["addenda"] = None, False, []
-        return self._json(result)
+            ORCH.process_session(sid, template)  # refuses a signed session
+        return self._json(_session_view(sid))
 
     def _verify(self, sid):
         """Re-checks the note as the therapist has edited it. Only the sentence
@@ -405,8 +470,13 @@ class Handler(BaseHTTPRequestHandler):
         if query.get("consent", [""])[0] != "1":
             return self._error(HTTPStatus.BAD_REQUEST, "the client's written consent to recording is required",
                                "需要先取得個案對錄音的書面同意。")
-        simulated = query.get("simulated", ["1"])[0] == "1"
+        # Absent means a real client: the safer reading. A recording wrongly marked
+        # as simulated would lose the care real data gets (and pass the pre-commit check).
+        simulated = query.get("simulated", ["0"])[0] == "1"
         _client(client_id)
+        if not session_id.startswith(f"{client_id.upper()}-"):
+            raise HttpError(HTTPStatus.BAD_REQUEST, "the session id must start with the client id",
+                            f"會談編號要以個案編號開頭，例如 {client_id}-S05。")
         suffix = Path(self.headers.get("X-Filename", "audio.wav")).suffix.lower()
         if suffix not in AUDIO_SUFFIXES:
             suffix = ".wav"
@@ -414,8 +484,12 @@ class Handler(BaseHTTPRequestHandler):
         if length == 0:
             raise HttpError(HTTPStatus.BAD_REQUEST, "the upload is empty", "沒有收到錄音：檔案是空的。請重新選擇錄音檔。")
         session_no = _reserve_upload(session_id, client_id)  # 409 when the id is taken or being uploaded
+        # In the data directory (0700), not the shared system temp directory. The
+        # file is removed in ``finally``, whatever happens below; what a crash or a
+        # power cut leaves behind is removed at the next start (files.clear_temp).
+        fd, tmp_name = tempfile.mkstemp(suffix=suffix, prefix="upload-", dir=files.temp_dir())
         try:
-            with tempfile.NamedTemporaryFile(suffix=suffix) as tmp:
+            with os.fdopen(fd, "wb") as tmp:
                 # Streamed to the temp file in 1 MB pieces, so the upload itself is not held in memory.
                 left = length
                 while left > 0:
@@ -424,22 +498,25 @@ class Handler(BaseHTTPRequestHandler):
                         break
                     tmp.write(chunk)
                     left -= len(chunk)
-                tmp.flush()
-                if left:
-                    raise HttpError(HTTPStatus.BAD_REQUEST, "the upload ended before the whole file arrived",
-                                    "上傳中斷，錄音沒有完整送達。請再上傳一次。")
-                try:
-                    t = transcribe_audio(Path(tmp.name), session_id, client_id, session_no, date.today().isoformat(), simulated)
-                except ImportError:
-                    raise HttpError(HTTPStatus.NOT_IMPLEMENTED, "faster-whisper is not installed",
-                                    "這台電腦還沒有安裝語音轉寫模組（faster-whisper）。") from None
-                except ASRError as e:
-                    raise HttpError(HTTPStatus.BAD_GATEWAY, f"speech-to-text server at {config.ASR_URL}: {e}",
-                                    "本機語音轉寫服務沒有回傳可用的逐字稿，請確認錄音檔格式後再試。") from None
-                except OSError:
-                    raise HttpError(HTTPStatus.SERVICE_UNAVAILABLE, f"speech-to-text server not reachable at {config.ASR_URL}",
-                                    "連不上本機語音轉寫服務，請確認它已經啟動。") from None
-            # The raw audio is never kept: the temp file is deleted on leaving the block.
+            if left:
+                raise HttpError(HTTPStatus.BAD_REQUEST, "the upload ended before the whole file arrived",
+                                "上傳中斷，錄音沒有完整送達。請再上傳一次。")
+            try:
+                t = transcribe_audio(Path(tmp_name), session_id, client_id, session_no, date.today().isoformat(), simulated)
+            except ImportError:
+                raise HttpError(HTTPStatus.NOT_IMPLEMENTED, "faster-whisper is not installed",
+                                "這台電腦還沒有安裝語音轉寫模組（faster-whisper）。") from None
+            except ASRError as e:
+                raise HttpError(HTTPStatus.BAD_GATEWAY, f"speech-to-text server at {config.ASR_URL}: {e}",
+                                "本機語音轉寫服務沒有回傳可用的逐字稿，請確認錄音檔格式後再試。") from None
+            except llm.NonLocalEndpointError:
+                raise HttpError(HTTPStatus.BAD_GATEWAY, "the speech-to-text endpoint is not local; nothing was sent",
+                                "語音轉寫服務的位址不是本機或診所區域網路，錄音沒有送出。請檢查設定。") from None
+            except OSError:
+                raise HttpError(HTTPStatus.SERVICE_UNAVAILABLE, f"speech-to-text server not reachable at {config.ASR_URL}",
+                                "連不上本機語音轉寫服務，請確認它已經啟動。") from None
+            finally:
+                _remove(tmp_name)  # Haven keeps no recording, on success or on failure
             if not t.segments:
                 raise HttpError(HTTPStatus.UNPROCESSABLE_ENTITY, "no speech was recognised in the recording",
                                 "錄音裡沒有辨識到任何語音，沒有建立會談。請確認錄音檔是否正確、有沒有聲音。")
@@ -450,15 +527,25 @@ class Handler(BaseHTTPRequestHandler):
                 for c in clients:
                     if c["id"] == client_id and session_id not in c.setdefault("sessions", []):
                         c["sessions"].append(session_id)
-                tmp_file = config.CLIENTS_FILE.with_suffix(".tmp")
-                tmp_file.write_text(json.dumps(clients, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-                tmp_file.replace(config.CLIENTS_FILE)
+                files.write_private(config.CLIENTS_FILE, json.dumps(clients, ensure_ascii=False, indent=2) + "\n")
+        except BaseException as e:
+            # A failed upload is recorded too (the id and the kind of failure, never content).
+            kind = f"HTTP {int(e.status)}" if isinstance(e, HttpError) else type(e).__name__
+            store.audit("upload_failed", f"{session_id} {kind}; temp audio removed")
+            raise
         finally:
+            _remove(tmp_name)
             with CLIENTS_LOCK:
                 UPLOADING.pop(session_id, None)
-        store.audit("transcribe_upload", f"{session_id} consent={CONSENT_SCOPE} simulated={int(simulated)} asr={config.ASR_BACKEND} speakers_guessed={labelled}/{len(t.segments)}; audio deleted after ASR")
-        with _session_lock(session_id):
-            return self._json(ORCH.process_session(session_id))
+        store.audit("transcribe_upload", f"{session_id} consent={CONSENT_SCOPE} simulated={int(simulated)} asr={config.ASR_BACKEND} speakers_guessed={labelled}/{len(t.segments)}; temp audio removed after ASR")
+        return self._json(_open_session(session_id))
+
+
+def _remove(path: str) -> None:
+    try:
+        os.unlink(path)
+    except FileNotFoundError:
+        pass
 
 
 def _reserve_upload(session_id: str, client_id: str) -> int:
@@ -485,6 +572,15 @@ def _reserve_upload(session_id: str, client_id: str) -> int:
 
 def serve() -> None:
     global ORCH
+    os.umask(0o077)  # whatever Haven creates is for this account only
+    files.secure_data_dir()
+    leftover = files.clear_temp()
+    if leftover:
+        print(f"Haven: removed {leftover} recording(s) left in {files.temp_dir()} by an earlier run that did not finish")
+    chain = store.verify_audit()
+    if not chain["ok"]:
+        print(f"Haven: WARNING: the audit log does not verify (first bad row id {chain['first_bad_id']}). "
+              "A row was changed, inserted or removed outside Haven. Run scripts/verify_audit.py.", file=sys.stderr)
     ORCH = Orchestrator()
     httpd = ThreadingHTTPServer((config.HOST, config.PORT), Handler)
     print(f"Haven running at http://{config.HOST}:{config.PORT}  (engine: {ORCH.engine})")

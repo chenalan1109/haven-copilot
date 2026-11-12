@@ -36,8 +36,8 @@ function el(tag, attrs = {}, ...children) {
 }
 
 async function api(path, opts = {}) {
-  // The server refuses POSTs without this header (cross-site request protection).
-  if (opts.method === "POST") opts.headers = { ...(opts.headers || {}), "X-Haven": "1" };
+  // The server refuses any API request without this header (cross-site request protection).
+  opts.headers = { ...(opts.headers || {}), "X-Haven": "1" };
   let res, data = {};
   try {
     res = await fetch(path, opts);
@@ -78,11 +78,25 @@ function fmtTime(sec) {
 async function loadStatus() {
   const s = await api("/api/status");
   const box = document.getElementById("status");
-  box.replaceChildren(
-    el("span", { class: "pill good" }, "本機運算 On-device"),
-    el("span", { class: "pill" }, `雲端連線 ${s.cloud_calls}`),
-    el("span", { class: "pill" }, `模型：${s.engine}`),
-  );
+  // Each pill states what the server looked up just now; none is a fixed number.
+  const where = (e) => !e.local ? "不是本機或區域網路位址" : e.loopback ? "本機" : "診所區域網路";
+  const host = (e) => { try { return new URL(e.url).host; } catch (err) { return e.url; } };
+  const pills = [];
+  if (s.llm) {
+    pills.push(el("span", { class: `pill ${s.llm.local ? "good" : "bad"}`, title: `目前解析到：${s.llm.addresses.join("、") || "無"}` },
+      `模型端點 ${host(s.llm)}（${where(s.llm)}）`));
+  } else {
+    pills.push(el("span", { class: "pill good", title: "沒有連接語言模型，紀錄由本機規則引擎產生" }, "未連接模型（本機規則引擎）"));
+  }
+  if (s.asr) {
+    pills.push(el("span", { class: `pill ${s.asr.local ? "good" : "bad"}`, title: `目前解析到：${s.asr.addresses.join("、") || "無"}` },
+      `轉寫端點 ${host(s.asr)}（${where(s.asr)}）`));
+  }
+  pills.push(el("span", { class: `pill ${s.refused_connections ? "bad" : ""}`,
+    title: "Haven 自己的端點檢查擋下的連線次數（啟動至今）。這不是封包側錄；模型伺服器本身連到哪裡，Haven 看不到。" },
+    `已拒絕的非本機連線：${s.refused_connections} 次`));
+  pills.push(el("span", { class: "pill" }, `模型：${s.engine}`));
+  box.replaceChildren(...pills);
 }
 
 async function loadClients() {
@@ -140,7 +154,7 @@ async function openClient(id) {
   markActive(id);
   const main = document.getElementById("main");
   main.replaceChildren(el("div", { class: "empty" }, "載入中…"));
-  const brief = await api(`/api/clients/${id}/brief`);
+  const brief = await api(`/api/clients/${encodeURIComponent(id)}/brief`);
   const frag = document.getElementById("tpl-client").content.cloneNode(true);
   const c = brief.client;
   frag.querySelector(".client-name").textContent = `${c.alias}・${c.age} 歲`;
@@ -177,7 +191,7 @@ async function openClient(id) {
       const r = await api(`/api/upload?${q}`, {
         method: "POST", headers: { "X-Filename": file.name }, body: file,
       });
-      upMsg.textContent = "完成，錄音已刪除。";
+      upMsg.textContent = "完成。Haven 不保存錄音，暫存檔已刪除。";
       await loadClients();
       renderSession(r);
     } catch (err) {
@@ -189,7 +203,10 @@ async function openClient(id) {
   const askOut = frag.querySelector(".ask-result");
   askForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const r = await api(`/api/clients/${id}/ask?q=${encodeURIComponent(askForm.q.value)}`);
+    // POST: the question is not put in the URL, and asking the model is not a read.
+    const r = await api(`/api/clients/${encodeURIComponent(id)}/ask`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q: askForm.q.value }),
+    });
     askOut.replaceChildren(
       r.answer ? el("p", {}, r.answer) : null,
       r.hits.length ? null : el("p", {}, "沒有找到相關片段。"),
@@ -207,7 +224,8 @@ async function openClient(id) {
 async function openSession(sid, focusSeg) {
   let r;
   try {
-    r = await api(`/api/sessions/${encodeURIComponent(sid)}`);
+    // POST: opening a session may draft its note, which a GET must never do.
+    r = await api(`/api/sessions/${encodeURIComponent(sid)}/open`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
   } catch (err) {
     document.getElementById("main").replaceChildren(el("div", { class: "empty" }, `無法開啟會談：${err.message}`));
     return;
@@ -281,6 +299,24 @@ function renderRiskGate() {
 // Flagged sentences the therapist has checked and kept as written.
 const confirmed = new Set();
 
+// Note sentences are plain text. "plaintext-only" keeps pasted markup out of the
+// page where the browser supports it; the paste handler does the same everywhere.
+const EDITABLE = (() => {
+  const probe = document.createElement("span");
+  try { probe.contentEditable = "plaintext-only"; } catch (err) { return "true"; }
+  return probe.contentEditable === "plaintext-only" ? "plaintext-only" : "true";
+})();
+
+function pastePlain(e) {
+  e.preventDefault();
+  const text = (e.clipboardData || window.clipboardData).getData("text/plain").replace(/\s*\n\s*/g, " ");
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  sel.deleteFromDocument();
+  sel.getRangeAt(0).insertNode(document.createTextNode(text));
+  sel.collapseToEnd();
+}
+
 function sentenceRow(s) {
   const flagged = s.status === "weak" || s.status === "unsupported";
   const locked = !!currentSession.signed;
@@ -298,7 +334,7 @@ function sentenceRow(s) {
   },
     el("div", { class: "body" },
       // Score lines come from the questionnaire data and a signed note is the record: neither is editable.
-      el("span", { class: "txt", contenteditable: locked || isMeasure ? "false" : "true", onclick: () => highlight(s.evidence), onfocus: () => highlight(s.evidence) }, s.text),
+      el("span", { class: "txt", contenteditable: locked || isMeasure ? "false" : EDITABLE, onpaste: pastePlain, onclick: () => highlight(s.evidence), onfocus: () => highlight(s.evidence) }, s.text),
       flagged ? el("div", { class: "reason" },
         isConfirmed ? "心理師已確認" : s.reason,
         isConfirmed || locked ? null : el("button", { class: "confirm", onclick: () => { confirmed.add(s.text); reverify(); } }, "確認無誤"),
@@ -324,7 +360,7 @@ function renderNote(container, note, verification) {
       SECTION_HINTS[key] && !currentSession.signed ? el("div", { class: "section-hint" }, SECTION_HINTS[key]) : null,
       items.length ? items.map(sentenceRow)
         : currentSession.signed ? el("div", { class: "sentence empty-section" }, "（無）")
-        : el("div", { class: "sentence", "data-evidence": "[]", "data-orig": "" }, el("span", { class: "txt", contenteditable: "true" }, "")),
+        : el("div", { class: "sentence", "data-evidence": "[]", "data-orig": "" }, el("span", { class: "txt", contenteditable: EDITABLE, onpaste: pastePlain }, "")),
     )),
   );
   const bar = document.getElementById("verify-summary");

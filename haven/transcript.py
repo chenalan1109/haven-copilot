@@ -163,8 +163,7 @@ def save_transcript(t: Transcript) -> Path:
         "simulated": t.simulated,
         "segments": [s.__dict__ for s in t.segments],
     }
-    # Written beside the target and renamed, so a reader never sees half a file.
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp.replace(path)
+    from .files import write_private
+
+    write_private(path, json.dumps(payload, ensure_ascii=False, indent=2))
     return path

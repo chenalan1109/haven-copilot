@@ -106,7 +106,7 @@ class ModelRejectedTest(unittest.TestCase):
 
     def test_model_no_blocks_signing_until_confirmed(self):
         class NoLLM:
-            def generate_json(self, system, prompt):
+            def generate_json(self, system, prompt, max_tokens=None):
                 return {"results": [{"id": i, "supported": False} for i in range(10)]}
         t = load_transcript("C001-S04")
         note = Note("SOAP", {"S": [NoteSentence("個案表示被主管當眾責罵後已辭職。", [2])]}, "test")
@@ -250,8 +250,8 @@ class ServerVerdictTest(ServerCase, unittest.TestCase):
         url = "http://127.0.0.1:1"
 
         @staticmethod
-        def generate_json(system, prompt):
-            if "紀錄句子" in prompt:
+        def generate_json(system, prompt, max_tokens=None):
+            if "\"sentence\"" in prompt:
                 return {"results": [{"id": i, "supported": True} for i in range(40)]}
             return None  # the writer falls back to the rule engine
 

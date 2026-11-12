@@ -33,7 +33,7 @@ class FakeLLM:
     def __init__(self, answer):
         self.answer, self.calls = answer, 0
 
-    def generate_json(self, system, prompt):
+    def generate_json(self, system, prompt, max_tokens=None):
         self.calls += 1
         return self.answer(prompt) if callable(self.answer) else self.answer
 
@@ -246,7 +246,7 @@ class FallbackTest(ServerCase, unittest.TestCase):
     llm = FakeLLM(None)
 
     def test_result_ui_fields_and_audit_say_rule_engine(self):
-        status, r = self.call("/api/sessions/C002-S05")
+        status, r = self.call("/api/sessions/C002-S05/open", {})
         self.assertEqual(status, 200)
         self.assertEqual(r["engine"], FALLBACK_ENGINE)
         self.assertEqual(r["note"]["engine"], FALLBACK_ENGINE)

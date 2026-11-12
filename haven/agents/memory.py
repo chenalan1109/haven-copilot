@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+
+from ..llm import DATA_ONLY
 from ..textutil import bigrams
 from ..transcript import load_transcript
 
@@ -11,7 +14,7 @@ SYNONYMS = {
     "自殺": "活著 消失 結束 生命", "工作": "主管 加班 公司", "作業": "作業 練習 紀錄",
 }
 
-SYSTEM_PROMPT = "你是心理師的個案資料助理。只能根據提供的逐字稿片段回答，每個說法標註 [會談編號#段落]，資料不足就說不知道。用繁體中文。"
+SYSTEM_PROMPT = "你是心理師的個案資料助理。只能根據提供的逐字稿片段回答，每個說法標註 [會談編號#段落]，資料不足就說不知道。用繁體中文。" + DATA_ONLY
 
 
 class CaseMemory:
@@ -43,7 +46,7 @@ class CaseMemory:
         hits = self.search(client, query)
         answer = None
         if self.llm is not None and hits:
-            context = "\n".join(f"[{h['session_id']}#{h['segment_id']}] {h['text']}" for h in hits)
-            raw = self.llm.generate_json(SYSTEM_PROMPT, f"片段：\n{context}\n\n問題：{query}\n輸出 {{\"answer\": \"...\"}}")
+            context = "\n".join(json.dumps({"ref": f"{h['session_id']}#{h['segment_id']}", "text": h["text"]}, ensure_ascii=False) for h in hits)
+            raw = self.llm.generate_json(SYSTEM_PROMPT, f"片段（每行一段，ref 是會談編號#段落）：\n{context}\n\n問題：{json.dumps(query, ensure_ascii=False)}\n輸出 {{\"answer\": \"...\"}}", max_tokens=600)
             answer = raw.get("answer") if raw else None
         return {"query": query, "answer": answer, "hits": hits}

@@ -62,7 +62,7 @@ class VerifierTest(unittest.TestCase):
 
     def test_llm_alone_cannot_clear_a_risk_sentence(self):
         class YesLLM:
-            def generate_json(self, system, prompt):
+            def generate_json(self, system, prompt, max_tokens=None):
                 return {"results": [{"id": i, "supported": True} for i in range(10)]}
         t = load_transcript("C001-S04")
         note = Note("SOAP", {"S": [NoteSentence("個案表示有時會想消失，但否認自殺意念。", [10])]}, "test")
@@ -72,7 +72,7 @@ class VerifierTest(unittest.TestCase):
     def test_study_plan_is_not_a_risk_sentence(self):
         # Seen on the B70 with Qwen3-32B: "讀書計畫" was treated as a risk "plan".
         class YesLLM:
-            def generate_json(self, system, prompt):
+            def generate_json(self, system, prompt, max_tokens=None):
                 return {"results": [{"id": i, "supported": True} for i in range(10)]}
         t = load_transcript("C002-S05")
         note = Note("SOAP", {"S": [NoteSentence("個案五天中有四天完成每天兩個番茄鐘的讀書計畫。", [7, 8])]}, "test")
@@ -81,7 +81,7 @@ class VerifierTest(unittest.TestCase):
 
     def test_weak_risk_sentence_blocks_signing(self):
         class YesLLM:
-            def generate_json(self, system, prompt):
+            def generate_json(self, system, prompt, max_tokens=None):
                 return {"results": [{"id": i, "supported": True} for i in range(10)]}
         t = load_transcript("C001-S04")
         note = Note("SOAP", {"S": [NoteSentence("個案表示有時會想消失，但否認自殺意念。", [10])]}, "test")

@@ -78,6 +78,7 @@ class MalformedRequestTest(ServerCase, unittest.TestCase):
 
     def test_unknown_session_and_client_are_404(self):
         self.assertEqual(self.call("/api/sessions/ZZZ-999")[0], 404)
+        self.assertEqual(self.call("/api/sessions/ZZZ-999/open", {})[0], 404)
         self.assertEqual(self.call("/api/sessions/ZZZ-999/process", {})[0], 404)
         self.assertEqual(self.call("/api/clients/NOPE/brief")[0], 404)
 
@@ -85,7 +86,7 @@ class MalformedRequestTest(ServerCase, unittest.TestCase):
         (config.SESSIONS_DIR / "C001-S66.json").write_text('{"session_id": "C001-S66", "secret-in-file', encoding="utf-8")
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
-            status, r = self.call("/api/sessions/C001-S66")
+            status, r = self.call("/api/sessions/C001-S66/open", {})
         self.assertEqual(status, 500)
         self.assertEqual(r["error"], "internal error")
         self.assertNotIn("Traceback", json.dumps(r))
@@ -98,7 +99,7 @@ class MalformedRequestTest(ServerCase, unittest.TestCase):
         # Inconsistent data must not look like "no such session".
         self.data.add_session("C001-S67", [("client", "最近睡不好。")], client_id="C999")
         with contextlib.redirect_stderr(io.StringIO()):
-            self.assertEqual(self.call("/api/sessions/C001-S67")[0], 500)
+            self.assertEqual(self.call("/api/sessions/C001-S67/open", {})[0], 500)
 
     def test_server_still_answers_after_a_fault(self):
         self.assertEqual(self.call("/api/status")[0], 200)
@@ -229,6 +230,7 @@ class ConcurrentUploadTest(UploadMixin, ServerCase, unittest.TestCase):
         self.assertIn("message_zh", r)
         self.assertEqual(server.UPLOADING, {})
         self.assertEqual(self.upload("C001-S84", "這週過得怎麼樣？\n不太好。")[0], 200)
+        self.assertFalse(list((config.DATA_DIR / "tmp").iterdir()))
 
 
 class EmptyUploadTest(UploadMixin, ServerCase, unittest.TestCase):

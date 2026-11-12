@@ -1,7 +1,17 @@
 __pycache__/
 *.pyc
-data/haven.db
+.DS_Store
+
+# Everything Haven writes while running stays out of git: it can hold real
+# session content. Only the three simulated demo transcripts are tracked.
+data/sessions/*
+!data/sessions/C001-S03.json
+!data/sessions/C001-S04.json
+!data/sessions/C002-S05.json
+data/*.db
+data/*.db-*
+data/*.tmp
+data/**/*.tmp
+data/tmp/
 data/audio/*
 !data/audio/.gitkeep
-.DS_Store
-data/haven.demo.db

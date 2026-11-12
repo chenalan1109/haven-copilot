@@ -11,8 +11,10 @@ sentence limit or by the model.
 
 from __future__ import annotations
 
+import json
 import re
 
+from ..llm import DATA_ONLY
 from ..models import Note, NoteSentence, Segment, Transcript
 from ..textutil import third_person
 from .risk import RiskAgent
@@ -53,7 +55,10 @@ SYSTEM_PROMPT = (
     "寫「個案表示」的句子，引用的段落必須是個案說的。"
     "心理師提議而逐字稿中沒有完成的事（例如「我們來擬安全計畫，好嗎？」）寫成「心理師提議…」，不可寫成已經完成。"
     "個案對自己的負面評價是個案的感受，寫成「個案表示覺得…」，不可寫成事實。"
+    + DATA_ONLY
 )
+# Upper bound on one reply (one part of at most CHUNK segments).
+MAX_TOKENS = 2000
 # Segments per request. A 50-minute session is several hundred segments: one request
 # would overrun the model's context, and the note would cover only the opening minutes.
 CHUNK = 60
@@ -65,12 +70,14 @@ def _prompt(t: Transcript, template: str, segments: list[Segment] | None = None,
         name = {"therapist": "心理師", "client": "個案"}.get(s.speaker, "說話者")
         return name + ("（推測）" if s.speaker_source == "model" else "")
     segments = t.segments if segments is None else segments
-    lines = [f"[{s.id}] {who(s)}：{s.text}" for s in segments]
+    # One JSON object per line. A line of speech cannot forge another line, a
+    # section heading or an instruction: its quotes and line breaks are escaped.
+    lines = [json.dumps({"id": s.id, "speaker": who(s), "text": s.text}, ensure_ascii=False) for s in segments]
     sections = "\n".join(f'- "{k}": {v}' for k, v in TEMPLATES[template].items())
     keys = ", ".join(f'"{k}": [{{"text": "...", "evidence": [段落編號]}}]' for k in TEMPLATES[template])
     where = f"（全長分成 {part[1]} 段處理，這是第 {part[0]} 段，只寫這一段的內容）" if part else ""
     return (
-        f"第 {t.session_no} 次會談逐字稿{where}：\n" + "\n".join(lines)
+        f"第 {t.session_no} 次會談逐字稿{where}，每行一段（id 是段落編號）：\n" + "\n".join(lines)
         + f"\n\n請撰寫 {template} 格式紀錄，各欄位意義：\n{sections}\n"
         + f"R 以外每欄 2 到 5 句，每句簡短。只輸出 JSON：{{{keys}}}"
     )
@@ -207,7 +214,7 @@ class NoteWriter:
 
     def _ask(self, prompt: str):
         try:
-            return self.llm.generate_json(SYSTEM_PROMPT, prompt)
+            return self.llm.generate_json(SYSTEM_PROMPT, prompt, max_tokens=MAX_TOKENS)
         except Exception:  # a model fault falls back to the rule engine, and says so
             return None
 

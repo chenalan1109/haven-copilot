@@ -107,19 +107,19 @@ class ServerTest(unittest.TestCase):
                 return e.code, json.load(e)
 
     def test_foreign_host_header_is_refused(self):
-        self.assertEqual(self.call("/api/status", headers={"Host": "evil.example:80"})[0], 403)
-        self.assertEqual(self.call("/api/status")[0], 200)
+        self.assertEqual(self.call("/api/status", headers={"Host": "evil.example:80", "X-Haven": "1"})[0], 403)
+        self.assertEqual(self.call("/api/status", headers={"X-Haven": "1"})[0], 200)
 
     def test_post_without_csrf_header_is_refused(self):
         status, _ = self.call("/api/sessions/C001-S03/sign", {"signed_by": "x", "note": {"sections": {}}})
         self.assertEqual(status, 403)
 
     def test_bad_session_id_is_rejected(self):
-        self.assertEqual(self.call("/api/sessions/..%2Fclients")[0], 400)
+        self.assertEqual(self.call("/api/sessions/..%2Fclients", headers={"X-Haven": "1"})[0], 400)
 
     def test_sign_rules(self):
         h = {"X-Haven": "1", "Content-Type": "application/json"}
-        self.assertEqual(self.call("/api/sessions/C002-S05")[0], 200)  # the server drafts the note first
+        self.assertEqual(self.call("/api/sessions/C002-S05/open", {}, h)[0], 200)  # the server drafts the note first
         # The status sent by the browser is ignored: this sentence is not in the transcript.
         bad = {"S": [{"text": "個案表示與母親關係良好。", "status": "supported", "confirmed_by_therapist": False}]}
         self.assertEqual(self.call("/api/sessions/C002-S05/sign", {"signed_by": "王", "note": {"sections": bad}}, h)[0], 409)

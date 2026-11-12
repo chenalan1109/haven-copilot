@@ -77,7 +77,7 @@ class ServerCase:
     @classmethod
     def call(self, path, body=None, headers=None, method=None):
         data = json.dumps(body).encode() if body is not None else None
-        req = urllib.request.Request(self.base + path, data=data, headers=headers or (H if data is not None else {}),
+        req = urllib.request.Request(self.base + path, data=data, headers=H if headers is None else headers,
                                      method=method or ("POST" if data is not None else "GET"))
         try:
             with urllib.request.urlopen(req) as r:
@@ -89,7 +89,7 @@ class ServerCase:
     @classmethod
     def draft(self, sid):
         """Opens a session and returns the note as the UI would send it back."""
-        status, r = self.call(f"/api/sessions/{sid}")
+        status, r = self.call(f"/api/sessions/{sid}/open", {})
         assert status == 200, r
         return r, {"template": r["note"]["template"], "sections": {
             k: [{"text": s["text"], "evidence": s["evidence"], "source": s["source"]} for s in v]
