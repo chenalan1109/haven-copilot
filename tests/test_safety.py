@@ -123,12 +123,17 @@ class ServerTest(unittest.TestCase):
         # The status sent by the browser is ignored: this sentence is not in the transcript.
         bad = {"S": [{"text": "個案表示與母親關係良好。", "status": "supported", "confirmed_by_therapist": False}]}
         self.assertEqual(self.call("/api/sessions/C002-S05/sign", {"signed_by": "王", "note": {"sections": bad}}, h)[0], 409)
-        kept = {"S": [dict(bad["S"][0], confirmed_by_therapist=True)]}
+        clicked = {"S": [dict(bad["S"][0], confirmed_by_therapist=True)]}
+        # It cites nothing, so one click is not enough: the therapist writes what it is based on.
+        self.assertEqual(self.call("/api/sessions/C002-S05/sign", {"signed_by": "王", "note": {"sections": clicked}}, h)[0], 409)
+        kept = {"S": [dict(clicked["S"][0], keep_reason="會談後個案來訊補充")]}
         self.assertEqual(self.call("/api/sessions/C002-S05/sign", {"signed_by": "王", "note": {"sections": kept}}, h)[0], 200)
         # A signed note is never overwritten.
         self.assertEqual(self.call("/api/sessions/C002-S05/sign", {"signed_by": "李", "note": {"sections": kept}}, h)[0], 409)
         self.assertEqual(store.get_signature("C002-S05")["signed_by"], "王")
-        self.assertIn("1 flagged", store.recent_audit()[0]["detail"])
+        audit = store.recent_audit()
+        self.assertIn("1 flagged", next(a for a in audit if a["action"] == "sign_note")["detail"])
+        self.assertIn("會談後個案來訊補充", next(a for a in audit if a["action"] == "uncited_sentence_kept")["detail"])
 
     def test_upload_requires_consent(self):
         h = {"X-Haven": "1"}

@@ -99,7 +99,7 @@ class Orchestrator:
             "timings_ms": timings,
         }
         store.save_result(session_id, result)
-        signing.remember(session_id, note, verification.get("llm_failed", False))
+        signing.remember(session_id, note, verification.get("llm_failed", False), by_model=self.verifier.llm is not None)
         store.audit("process_session", f"{session_id} engine={note.engine}" + (f" configured={self.engine}" if note.engine != self.engine else "")
                     + ("; verifier: local model did not answer" if verification.get("llm_failed") else ""))
         return result
@@ -125,7 +125,7 @@ class Orchestrator:
         result["risk_uncovered"] = signing.uncovered_risk(result["risk"], note)
         result["warnings"] = stored.get("warnings", []) + result["verification"].get("warnings", [])
         store.save_result(session_id, result)
-        signing.remember(session_id, note, result["verification"].get("llm_failed", False))
+        signing.remember(session_id, note, result["verification"].get("llm_failed", False), by_model=self.verifier.llm is not None)
         store.audit("reverify_stored_draft", f"{session_id} verifier={VERIFIER_VERSION}")
         return result
 

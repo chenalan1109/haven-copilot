@@ -13,6 +13,7 @@ The word families below were widened from the 2026-11-12 clinical review and are
 from __future__ import annotations
 
 import json
+import re
 
 from ..llm import DATA_ONLY
 from ..textutil import bigrams
@@ -33,6 +34,16 @@ FAMILIES = [
 ]
 # Question scaffolding; not what is being asked about.
 _STOP = bigrams("哪幾次提到什麼時候有沒有談到說過講過曾經個案哪一次是否幾次")
+_STOP_PHRASES = sorted("哪幾次 哪一次 哪次 幾次 什麼時候 有沒有 是否 曾經 提到 提過 談到 談過 說過 講過 個案 關於 他 她 的 嗎 呢 了 過".split(), key=len, reverse=True)
+_PUNCT = re.compile(r"[\s\W_]+")
+
+
+def topic(query: str) -> str:
+    """What is left of a question once the scaffolding is gone: 「哪幾次提到貓？」 → 「貓」."""
+    rest = _PUNCT.sub("", query)
+    for w in _STOP_PHRASES:
+        rest = rest.replace(w, "")
+    return rest
 PER_SESSION = 3  # lines shown per session; the count of all matching lines is always given
 MAX_SHOWN = 30
 
@@ -55,6 +66,11 @@ class CaseMemory:
     def search(self, client: dict, query: str) -> list[dict]:
         """Every matching line in every session of this client, best first within a session."""
         terms = expand(query)
+        rest = topic(query)
+        if not terms and 0 < len(rest) <= 2:
+            # One or two characters (貓, 藥, 哥哥 would be 2): bigrams of the whole
+            # question never match, so look for the word itself.
+            terms = [rest]
         q = bigrams(query) - _STOP
         hits = []
         for session_id in client.get("sessions", []):

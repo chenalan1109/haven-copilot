@@ -20,6 +20,8 @@ from .models import Note, NoteSentence, Transcript, to_dict
 SECTION_KEYS = {name: tuple(sections) for name, sections in TEMPLATES.items()}
 GATED_LEVELS = ("high", "critical")
 MAX_TEXT = 2000
+MAX_REASON = 500
+MIN_REASON = 2
 
 
 class BadNote(ValueError):
@@ -38,22 +40,28 @@ def _key(text: str, evidence: list[int]) -> tuple[str, str]:
     return text, json.dumps(evidence)
 
 
-def remember(session_id: str, note: Note, llm_failed: bool = False) -> None:
-    """Stores the server's verdict on each transcript sentence of ``note``."""
+def remember(session_id: str, note: Note, llm_failed: bool = False, by_model: bool = False) -> None:
+    """Stores the server's verdict on each transcript sentence of ``note``.
+    ``by_model``: a local model was there to rule on the sentences the rules
+    could not settle. A verdict made without one is not reused by a check that
+    has a model, so turning the model on later does change the result."""
     verdicts = {}
     for s in note.sentences():
         if s.source == "measure" or s.status == "unchecked":
             continue
         if llm_failed and s.status != "supported":
             continue  # the model did not answer: ask again next time
-        verdicts[_key(s.text, s.evidence)] = {"status": s.status, "support": s.support, "reason": s.reason, "model_rejected": s.model_rejected}
+        verdicts[_key(s.text, s.evidence)] = {"status": s.status, "support": s.support, "reason": s.reason,
+                                              "model_rejected": s.model_rejected, "by_model": by_model and not llm_failed}
     if verdicts:
         store.save_verdicts(session_id, transcript_sha256(session_id), VERIFIER_VERSION, verdicts)
 
 
-def note_from_payload(session_id: str, payload, template: str, engine: str, measures: list[str]) -> tuple[Note, list[str]]:
+def note_from_payload(session_id: str, payload, template: str, engine: str, measures: list[str], with_model: bool = False) -> tuple[Note, list[str]]:
     """Builds the note to check from what the browser sent. Returns the note and the
-    texts sent as score lines that are not the server's score lines."""
+    texts sent as score lines that are not the server's score lines. With
+    ``with_model``, a cached verdict the rules alone reached (other than
+    "supported") is set aside so the model gets its turn."""
     if not isinstance(payload, dict) or not isinstance(payload.get("sections"), dict):
         raise BadNote("note.sections must be an object")
     if payload.get("template") in SECTION_KEYS:
@@ -78,13 +86,19 @@ def note_from_payload(session_id: str, payload, template: str, engine: str, meas
             if not isinstance(evidence, list) or not all(isinstance(e, int) and not isinstance(e, bool) for e in evidence):
                 raise BadNote("evidence must be a list of segment numbers")
             confirmed = item.get("confirmed_by_therapist") is True
+            keep_reason = item.get("keep_reason", "")
+            if not isinstance(keep_reason, str) or len(keep_reason) > MAX_REASON:
+                raise BadNote("keep_reason must be a short text")
             if text in measures and not evidence:
                 sections[key].append(NoteSentence(text, [], source="measure"))
                 continue
             if item.get("source") == "measure":
                 forged.append(text)
-            s = NoteSentence(text, evidence, confirmed_by_therapist=confirmed)
+            s = NoteSentence(text, evidence, confirmed_by_therapist=confirmed,
+                             keep_reason=keep_reason.strip() if confirmed and not evidence else "")
             seen = known.get(_key(text, evidence))
+            if seen and with_model and not seen.get("by_model") and seen["status"] != "supported":
+                seen = None
             if item.get("source") == "measure":
                 s.source = "measure"  # the verifier turns it into an unsupported claim
             elif seen:
@@ -127,12 +141,21 @@ def parse_dismissals(raw) -> list[dict]:
     return out
 
 
+def needs_reason(s: NoteSentence) -> bool:
+    """A sentence that cites no transcript line is kept only with the therapist's
+    written basis: one click would let a made-up sentence through as easily as
+    the therapist's own observation."""
+    return s.source != "measure" and not s.evidence and len(s.keep_reason) < MIN_REASON
+
+
 def blocking_sentences(note: Note) -> list[NoteSentence]:
     """Sentences that stop signing: unchecked, unsupported, or held for
-    confirmation, unless the therapist confirmed that exact sentence."""
+    confirmation, unless the therapist confirmed that exact sentence (and, for a
+    sentence with no citation, wrote what it is based on)."""
     return [s for s in note.sentences()
             if s.status not in ("supported", "weak", "unsupported")
-            or ((s.status == "unsupported" or s.must_confirm) and not s.confirmed_by_therapist)]
+            or ((s.status == "unsupported" or s.must_confirm) and not s.confirmed_by_therapist)
+            or (s.status == "unsupported" and needs_reason(s))]
 
 
 def summarize(note: dict) -> dict:
@@ -148,7 +171,7 @@ def check(session_id: str, transcript: Transcript, payload, template: str, engin
     """Re-verifies what the browser sent. Sentences the server has already judged
     (same text, same citations, same transcript, same rules) keep that verdict;
     the rest go through ``verifier``."""
-    note, forged = note_from_payload(session_id, payload, template, engine, measures)
+    note, forged = note_from_payload(session_id, payload, template, engine, measures, with_model=verifier.llm is not None)
     verification = verifier.run(note, transcript, measures)
     return note, verification, forged
 

@@ -55,6 +55,8 @@ class NoteSentence:
     model_rejected: bool = False
     # The therapist read a flagged sentence against the transcript and kept it as written.
     confirmed_by_therapist: bool = False
+    # A kept sentence that cites no transcript line: what the therapist based it on.
+    keep_reason: str = ""
 
 
 @dataclass

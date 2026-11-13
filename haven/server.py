@@ -413,7 +413,7 @@ class Handler(BaseHTTPRequestHandler):
         payload = self._payload()
         result, transcript, measures = _draft(sid)
         note, verification, _ = signing.check(sid, transcript, payload, result["note"]["template"], result["note"].get("engine", ""), measures, ORCH.verifier)
-        signing.remember(sid, note, verification.get("llm_failed", False))
+        signing.remember(sid, note, verification.get("llm_failed", False), by_model=ORCH.verifier.llm is not None)
         store.audit("verify", f"{sid} {verification['supported']}/{verification['total']} supported"
                     + ("; local model did not answer" if verification.get("llm_failed") else ""))
         return self._json({"note": to_dict(note), "verification": verification,
@@ -438,7 +438,8 @@ class Handler(BaseHTTPRequestHandler):
         blocking = signing.blocking_sentences(note)
         if blocking:
             raise Refused(f"{len(blocking)} sentence(s) unverified, unsupported, or held for confirmation; re-verify, edit or confirm them first",
-                          f"還有 {len(blocking)} 句沒有通過驗證（無支持證據、與風險有關而支持不足，或被本機模型否決）。請先修改、刪除，或逐句按「確認無誤」，再重新驗證。",
+                          f"還有 {len(blocking)} 句沒有通過驗證（無支持證據、與風險有關而支持不足，或被本機模型否決）。請先修改、刪除，或逐句按「保留此句」"
+                          "（沒有引用逐字稿的句子要寫下依據），再重新驗證。",
                           blocking=[s.text for s in blocking])
         risk = to_dict(ORCH.risk.run(transcript))
         known = {f["segment_id"] for f in risk["flags"]}
@@ -454,7 +455,8 @@ class Handler(BaseHTTPRequestHandler):
         signature = store.sign_note(
             sid, signed, signed_by.strip(), kept,
             transcript_sha256=signing.transcript_sha256(sid), note_sha256=signing.note_sha256(signed), verifier_version=VERIFIER_VERSION,
-            audit_rows=[("risk_cue_left_out", f"{sid} #{d['segment_id']}: {d['reason']}") for d in dismissals],
+            audit_rows=[("risk_cue_left_out", f"{sid} #{d['segment_id']}: {d['reason']}") for d in dismissals]
+            + [("uncited_sentence_kept", f"{sid} 「{s.text[:40]}」: {s.keep_reason}") for s in note.sentences() if s.keep_reason],
         )
         return self._json(signature)
 

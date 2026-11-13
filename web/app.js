@@ -46,6 +46,7 @@ let verifyAgain = false;
 let verifyTimer = null;
 let serverStatus = null;
 const confirmed = new Set(); // keys of flagged sentences the therapist checked and kept
+const keepReasons = new Map(); // key -> what a kept sentence with no citation is based on
 const dismissed = new Map(); // segment id -> reason, for high-level risk cues left out of the note
 
 // ---------- small helpers ----------
@@ -533,6 +534,7 @@ function notePayload() {
         text: s.text.trim(), evidence: s.evidence,
         source: isDirty(s) ? "transcript" : (s.source || "transcript"),
         confirmed_by_therapist: confirmed.has(s.key) && !isDirty(s),
+        keep_reason: confirmed.has(s.key) && !isDirty(s) ? (keepReasons.get(s.key) || "") : "",
       };
     });
   }
@@ -601,7 +603,7 @@ function sentenceRow(sectionKey, s) {
     role: editable ? "textbox" : null, "aria-multiline": editable ? "false" : null,
     "aria-label": editable ? `${SECTION_NAMES[sectionKey] || sectionKey} 的紀錄句子，可以修改` : null,
     "aria-describedby": flagged ? reasonId : null,
-    "data-placeholder": editable ? "（點這裡輸入句子；新句子沒有引用逐字稿，需要您確認保留）" : null,
+    "data-placeholder": editable ? "（點這裡輸入句子；新句子沒有引用逐字稿，保留時要寫下依據）" : null,
     onpaste: editable ? pastePlain : null,
     onclick: () => highlight(s.evidence),
     onfocus: () => highlight(s.evidence, false),
@@ -611,8 +613,11 @@ function sentenceRow(sectionKey, s) {
   }, s.text);
   const reason = flagged ? el("div", { class: "reason", id: reasonId },
     state === "confirmed" ? `已由您確認保留。原因：${s.reason}` : s.reason,
+    state === "confirmed" && (locked ? s.keep_reason : keepReasons.get(s.key))
+      ? el("div", {}, `依據：${locked ? s.keep_reason : keepReasons.get(s.key)}`) : null,
     state === "confirmed" || locked ? null
-      : el("button", { type: "button", class: "confirm", onclick: () => keep(s) }, "保留此句（我已核對）"),
+      : el("button", { type: "button", class: "confirm", onclick: () => keep(s) },
+        (s.evidence || []).length ? "保留此句（我已核對）" : "保留此句（寫下依據）"),
   ) : null;
   row.append(
     badge(s, state),
@@ -635,6 +640,7 @@ function onEdit(s, row) {
   s.text = txt.textContent;
   edited = true;
   confirmed.delete(s.key); // a confirmation was for the words as they were
+  keepReasons.delete(s.key);
   const dirty = isDirty(s);
   if (dirty && !row.classList.contains("dirty")) {
     row.className = "sentence dirty";
@@ -654,6 +660,16 @@ function keep(s) {
   if (isDirty(s)) { // confirm what was checked, not what is half typed
     showMessage("這句剛修改過，先重新驗證；如果仍被標示，再按一次「保留此句」。", true);
     reverify();
+    return;
+  }
+  if (!(s.evidence || []).length) {
+    askReason("保留沒有引用的句子", `「${s.text.trim()}」`, "這句的依據（例如：會談中觀察到的非語言行為、會談外取得的資訊）。會存進簽核紀錄和稽核紀錄。", (reason) => {
+      keepReasons.set(s.key, reason);
+      confirmed.add(s.key);
+      edited = true;
+      renderNote();
+      focusNextBlocking(false);
+    });
     return;
   }
   confirmed.add(s.key);
@@ -740,8 +756,23 @@ function renderNote() {
   renderSummary();
 }
 
+// A demo notice names the planted sentence in 「」; once it is fixed or deleted the notice goes.
+function demoQuote(w) {
+  const m = w.startsWith("示範用：") ? w.match(/「([^」]+)」/) : null;
+  return m ? m[1] : null;
+}
+
+function renderDemoNotices() {
+  const box = document.getElementById("warnings");
+  if (!box) return;
+  const texts = new Set(allSentences().map((s) => s.text.trim()));
+  box.querySelectorAll("[data-quote]").forEach((d) => { d.hidden = !texts.has(d.dataset.quote); });
+  box.hidden = ![...box.children].some((d) => !d.hidden);
+}
+
 function renderSummary() {
   if (!session) return;
+  renderDemoNotices();
   const c = counts();
   const counter = document.getElementById("verify-counter");
   const bar = document.getElementById("verify-summary");
@@ -781,23 +812,31 @@ function renderSummary() {
 
 // ----- risk panel -----
 
-function dismissCue(u) {
+function askReason(title, quote, label, done) {
   const dlg = document.getElementById("reason-dialog");
   const form = document.getElementById("reason-form");
-  document.getElementById("reason-quote").textContent = `#${u.segment_id}（${u.category}）「${u.quote}」`;
+  document.getElementById("reason-title").textContent = title;
+  document.getElementById("reason-quote").textContent = quote;
+  document.getElementById("reason-label").textContent = label;
   form.reason.value = "";
   form.onsubmit = (e) => {
     e.preventDefault();
     const reason = form.reason.value.trim();
     if (reason.length < 2) return;
-    dismissed.set(u.segment_id, reason);
-    edited = true;
     dlg.close();
-    renderRiskGate();
-    renderSummary();
+    done(reason);
   };
   document.getElementById("reason-cancel").onclick = () => dlg.close();
   dlg.showModal();
+}
+
+function dismissCue(u) {
+  askReason("不納入紀錄的理由", `#${u.segment_id}（${u.category}）「${u.quote}」`, "理由（會寫入稽核紀錄）", (reason) => {
+    dismissed.set(u.segment_id, reason);
+    edited = true;
+    renderRiskGate();
+    renderSummary();
+  });
 }
 
 function renderRiskGate() {
@@ -886,6 +925,7 @@ function renderSession(r, focusSeg) {
   currentClient = r.client_id;
   markActive(r.client_id);
   confirmed.clear(); // confirmations belong to one note
+  keepReasons.clear();
   dismissed.clear();
   edited = false;
   verifying = false;
@@ -947,7 +987,7 @@ function renderSession(r, focusSeg) {
 
   // How the draft was made, when it matters: the model did not answer and the rule engine wrote it.
   const warnings = (r.warnings || []).length && !locked
-    ? el("div", { class: "warnings", role: "alert" }, r.warnings.map((w) => el("div", {}, w))) : null;
+    ? el("div", { class: "warnings", id: "warnings", role: "alert" }, r.warnings.map((w) => el("div", { "data-quote": demoQuote(w) }, w))) : null;
   main.replaceChildren(head, warnings || "", el("div", { class: "workspace" }, transcript, notePanel));
   renderRiskGate();
   renderNote();
