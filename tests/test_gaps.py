@@ -97,10 +97,15 @@ class DocsTest(unittest.TestCase):
         for target in re.findall(r"\]\(([^)#:]+\.md)\)", results):
             self.assertTrue((REPO / "docs" / target).exists(), target)
 
-    def test_asr_result_is_marked_as_not_in_the_repository(self):
-        self.assertFalse((REPO / "docs" / "asr-eval" / "b70-whisper-turbo-real-voices.md").exists(),
-                         "the real result file has arrived: replace the placeholder section in docs/asr-eval/README.md")
-        self.assertIn("exist only on the B70", (REPO / "docs" / "asr-eval" / "README.md").read_text(encoding="utf-8"))
+    def test_b70_result_files_back_up_the_quoted_numbers(self):
+        """The CER and the 36-minute timing are quoted only with their result files in the repository."""
+        asr = REPO / "docs" / "asr-eval"
+        self.assertIn("**Character error rate 14.1%**", (asr / "b70-whisper-turbo-real-voices.md").read_text(encoding="utf-8"))
+        self.assertTrue((asr / "b70-whisper-turbo-real-voices.json").exists())
+        self.assertNotIn("exist only on the B70", (asr / "README.md").read_text(encoding="utf-8"))
+        long = (REPO / "docs" / "benchmarks" / "tmp-l36.md").read_text(encoding="utf-8")
+        self.assertIn("| C002-L50 | 2181.5 s | 63.9 s |", long)
+        self.assertTrue((REPO / "data" / "sessions" / "C002-L50.json").exists())
 
     def test_lan_warning(self):
         self.assertEqual(server.lan_warning("127.0.0.1"), "")

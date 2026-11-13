@@ -25,6 +25,12 @@ Known limits of these runs: single runs (a second run of C002-S05 on 32B gave 5/
 
 With Whisper on the same card (from the launcher's notes, `scripts/b70-vllm.sh`): 24.5 of 30.3 GiB free after Whisper loads; the 32B model at `UTIL=0.8` gets 18.1 GiB of weights and 4.9 GiB of context cache.
 
+## One long session on the B70 (2026-11-10, before the fixes)
+
+C002-L50 is a simulated session of 36.4 minutes by its timestamps (339 segments), written by Qwen3-32B with `scripts/make_long_session.py` ([data/sessions/C002-L50.json](../data/sessions/C002-L50.json)). Qwen3-32B AWQ drafted and verified the note from the finished transcript in **63.9 s** (writer 52.0 s, verifier 11.9 s, 21.8 output tok/s); 10 of 25 sentences passed the verifier. Source: [benchmarks/tmp-l36.md](benchmarks/tmp-l36.md) (+ .json, and the 15 held sentences in `tmp-l36-review.csv`, not yet judged by a clinician).
+
+This is where "a 36-minute session in 64 s" comes from. Limits: one run; made with commit 6cf8441, before the 2026-11-12 fixes (the chunked writer for long sessions and the current verifier rules did not exist yet); speech-to-text not included; Whisper was served on the same card (the speech-to-text check above ran seven minutes earlier) but was idle during this run; 16k context; peak memory was not recorded. Rerun under the current code before quoting it.
+
 ## Laptop (MacBook Air M2, 8 GB, qwen2.5:7b, 2026-11-03, before the fixes)
 
 | Draft note time, 3 sessions | 2 sessions at once | Output tok/s | Passed the verifier | Source |
@@ -51,7 +57,7 @@ Reported by `tests/test_risk_recall.py` on every run: 64 of 64 on the reviewer's
 
 ## Speech-to-text
 
-One clip, 23.0 s, three utterances, on the B70: character error rate 14.1%, 0.5 s to transcribe, 3 of 3 speakers guessed. The result files are not in this repository yet: see [asr-eval/README.md](asr-eval/README.md).
+One clip, 23.0 s, three utterances, on the B70 (2026-11-10, before the fixes): character error rate 14.1%, 0.5 s to transcribe, 3 of 3 speakers guessed. Source: [asr-eval/b70-whisper-turbo-real-voices.md](asr-eval/b70-whisper-turbo-real-voices.md) (+ .json); notes in [asr-eval/README.md](asr-eval/README.md).
 
 ## Pending (needs the B70, which is available until 2026-12-02)
 

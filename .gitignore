@@ -3,11 +3,13 @@ __pycache__/
 .DS_Store
 
 # Everything Haven writes while running stays out of git: it can hold real
-# session content. Only the three simulated demo transcripts are tracked.
+# session content. Only the simulated demo transcripts are tracked.
 data/sessions/*
 !data/sessions/C001-S03.json
 !data/sessions/C001-S04.json
 !data/sessions/C002-S05.json
+# Simulated 36-minute session written by scripts/make_long_session.py; the B70 long-session benchmark ran on it.
+!data/sessions/C002-L50.json
 data/*.db
 data/*.db-*
 data/*.tmp
