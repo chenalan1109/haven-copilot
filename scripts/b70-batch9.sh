@@ -46,8 +46,15 @@ wait_for() {  # port name seconds
 MON_PID=""
 start_monitor() {
   if command -v xpu-smi >/dev/null 2>&1; then
-    # Metric ids as documented for xpu-smi dump: 0 utilization %, 1 power W, 18 memory used MiB.
-    xpu-smi dump -d "$CARD" -m 0,1,18 -i 1 > "$OUT/monitor.csv" 2>&1 &
+    # xpu-smi 2.0 on the B70 machine: field-name query. Its --loop mode needs a
+    # terminal and stalls in the background, so one single-shot query a second.
+    # Columns: timestamp, utilization.gpu %, power.draw W, memory.used MiB.
+    ( echo "timestamp, utilization.gpu, power.draw, memory.used"
+      while true; do
+        xpu-smi --query-gpu=timestamp,utilization.gpu,power.draw,memory.used --id="$CARD" \
+          --format=csv,noheader,nounits </dev/null 2>/dev/null
+        sleep 1
+      done ) > "$OUT/monitor.csv" &
     MON_PID=$!
     log "monitor: xpu-smi dump on card $CARD -> $OUT/monitor.csv"
   else
@@ -55,7 +62,7 @@ start_monitor() {
     log "monitor: xpu-smi not found, power and memory are NOT recorded"
   fi
 }
-stop_monitor() { [ -n "$MON_PID" ] && kill "$MON_PID" 2>/dev/null; MON_PID=""; }
+stop_monitor() { [ -n "$MON_PID" ] && { pkill -P "$MON_PID" 2>/dev/null; kill "$MON_PID" 2>/dev/null; }; MON_PID=""; }
 trap 'stop_monitor; docker rm -f vllm-haven vllm-asr >/dev/null 2>&1' EXIT
 
 # Peak memory and mean power between two wall-clock times (HH:MM:SS) from monitor.csv.
@@ -69,17 +76,17 @@ try:
 except OSError:
     rows = []
 for r in rows[1:]:
-    if len(r) < 5:
+    if len(r) < 4:
         continue
     m = re.search(r"(\d\d:\d\d:\d\d)", r[0])
     if not m or not (start <= m.group(1) <= end):
         continue
     try:
-        power.append(float(r[3])); mem.append(float(r[4]))
+        power.append(float(r[2])); mem.append(float(r[3]))
     except ValueError:
         pass
 if power:
-    print(f"peak memory {max(mem) / 1024:.1f} GiB, mean power {sum(power) / len(power):.0f} W over {len(power)} s")
+    print(f"peak memory {max(mem) / 1024:.1f} GiB, mean power {sum(power) / len(power):.0f} W from {len(power)} samples")
 else:
     print("no monitor samples")
 EOF
