@@ -47,10 +47,30 @@ Sources: `benchmarks/b70-qwen3-{32b-awq,8b}-*-20261114-0742.md` (+ .json, -revie
 
 Energy: one 49.5-minute session alone takes 230 W × 245 s ≈ 15.7 Wh of card energy; four at once take 230 W × 280 s ÷ 4 ≈ 4.5 Wh each. Card only, not the whole machine. vLLM reports that at 32k tokens per request the 32B cache holds 1.24 requests at once; the four rooms still finished within 14% of one room's time because the note is written in parts of 60 segments, far below 32k each.
 
-**"Passed the verifier" varies widely between runs of the same session and must not be quoted from one run.** 32B on C002-L50 over nine runs (three alone, six in 2- and 4-room runs): 42–88 of 92–120 sentences, with no link to how many rooms ran (alone: 88, 68, 53; together: 42–78) and no verifier timeouts (verifier 21–33 s in every run). Two causes, both fixed after this batch (verifier rules 2026.11-5), neither yet re-measured:
+**"Passed the verifier" varies widely between runs of the same session and must not be quoted from one run.** 32B on C002-L50 over nine runs (three alone, six in 2- and 4-room runs): 42–88 of 92–120 sentences, with no link to how many rooms ran (alone: 88, 68, 53; together: 42–78) and no verifier timeouts (verifier 21–33 s in every run). Two causes, both fixed after this batch (verifier rules 2026.11-5, commit 1c8247a), and re-measured below:
 
 1. *Pronoun rule.* 「個案表示當他嘗試…」 over the client's own 「我…」 was held as an unknown pronoun: 11–22 sentences per run, 344 over all 18 runs of both models. The rule now lets 他/她 through when the cited lines are all the client's (confirmed speakers), say 我, contain no 他/她, and the sentence is not about risk. Re-checked against the batch-9 sentences, 326 of the 344 no longer stop at this rule (they still face the overlap and model checks).
 2. *Invented observations.* In the low runs the local model rejected 23–35 sentences such as 「語氣中透露出成就感」 or 「表現出思索的神情」: tone and expression a transcript cannot show. The verifier was right; the writer's O-section instruction gave 「語速」 as an example. It now says to write only what the transcript text shows and to leave tone, pace, expression and inferred affect to the therapist.
+
+### Batch 9 rerun after the fixes (2026-11-14 09:06, commit 1c8247a, Qwen3-32B only)
+
+Same card, same settings, same steps ([summary](b70-batch9/20261114-0906/summary.md)).
+
+| C002-L50, 9 runs of 32B | Before the fixes (0742) | After (0906) |
+| --- | --- | --- |
+| Passed the verifier, per run | 40–78%, median 56% | 75–93%, median 84% |
+| Sentences per note | 92–120 | 83–151 |
+| Held for an unknown pronoun, per run | 11–22 | 0–4 |
+| One room | 244.9 s | 297.0 s |
+| 2 rooms at once, all done | 261.7 s | 283.7 s |
+| 4 rooms at once, all done | 279.5 s | 365.0 s |
+| Card power, peak memory | about 230 W, 30.8 GiB | about 230 W, 30.8 GiB |
+| Verifier test set | 30/30, 1/18 | 30/30, 1/18 |
+| Demo sessions, median of 3 | 27.1 / 31.9 / 16.5 s | 27.4 / 29.2 / 15.9 s |
+
+Sources: `benchmarks/b70-qwen3-32b-awq-*-20261114-0906.md` (+ .json, -review.csv), `verifier-eval/b70-qwen3-32b-awq-20261114-0906.md`.
+
+The model still rejects 0–24 sentences per run, now mostly in the assessment section: a therapist's question written as the therapist's view (「是不是一種逃避？」 → 「心理師認為…是一種逃避」) or praise extended with content the therapist did not say. These look like real catches, but only a clinician's reading of the review sheets can say so. Notes are longer after the fix (up to 151 sentences), and four rooms at once took 365 s, over the 5-minute target even before speech-to-text; with two rooms everything finished in under 5 minutes. Still one session and nine runs; not an accuracy figure.
 
 ## One long session on the B70 (2026-11-10, before the fixes)
 
@@ -92,7 +112,6 @@ One clip, 23.0 s, three utterances, on the B70 (2026-11-10, before the fixes): c
 
 | Measurement | Why it matters |
 | --- | --- |
-| Batch 9 again under verifier rules 2026.11-5 and the new O-section prompt, C002-L50 three times | Whether the two fixes narrow the 42–88 spread; until then no pass rate from batch 9 is quoted |
 | Clinical review of the batch-9 review sheets (`*-20261114-0742-review.csv`) | Separates real errors from correct sentences held back |
 | A 50-minute session through Whisper while the note model runs | Speech-to-text was loaded in batch 9 but not exercised |
 | A recording of 10 minutes or more through Whisper | Real-time factor, error rate, recording-to-draft time |

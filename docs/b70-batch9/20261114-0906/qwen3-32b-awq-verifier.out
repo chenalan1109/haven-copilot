@@ -1,0 +1,4 @@
+engine: openai-compat:qwen3-32b-awq
+  wrong sentences blocked: 30/30 (100%), flagged: 30/30 (100%)
+  right sentences blocked (false alarms): 1/18 (6%)
+wrote docs/verifier-eval/b70-qwen3-32b-awq-20261114-0906.md

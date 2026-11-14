@@ -1,0 +1,16 @@
+- 09:06:35 monitor: xpu-smi dump on card 0 -> docs/b70-batch9/20261114-0906/monitor.csv
+- 09:06:35 idle baseline: 30 s
+- 09:07:05 starting Whisper
+- 09:09:21 starting qwen3-32b-awq: 32k context, fp8 context cache
+- 09:11:32 qwen3-32b-awq ready (32768, fp8 cache)
+- 09:11:52 step qwen3-32b-awq-verifier: python3 scripts/verifier_eval.py --label b70-qwen3-32b-awq-20261114-0906
+- 09:12:05 step qwen3-32b-awq-verifier finished (exit 0)
+- 09:12:05 step qwen3-32b-awq-repeat3: python3 scripts/benchmark.py --repeat 3 --label b70-qwen3-32b-awq-repeat3-20261114-0906
+- 09:15:39 step qwen3-32b-awq-repeat3 finished (exit 0)
+- 09:15:39 step qwen3-32b-awq-long-1room: python3 scripts/benchmark.py --sessions C002-L50 --label b70-qwen3-32b-awq-L50-20261114-0906
+- 09:20:36 step qwen3-32b-awq-long-1room finished (exit 0)
+- 09:20:36 step qwen3-32b-awq-long-2rooms: python3 scripts/benchmark.py --sessions C002-L50 --rooms 2 --label b70-qwen3-32b-awq-L50-2rooms-20261114-0906
+- 09:29:43 step qwen3-32b-awq-long-2rooms finished (exit 0)
+- 09:29:43 step qwen3-32b-awq-long-4rooms: python3 scripts/benchmark.py --sessions C002-L50 --rooms 4 --label b70-qwen3-32b-awq-L50-4rooms-20261114-0906
+- 09:40:00 step qwen3-32b-awq-long-4rooms finished (exit 0)
+- 09:40:00 done: docs/b70-batch9/20261114-0906/summary.md

@@ -22,7 +22,7 @@ What this does and does not claim is spelled out under "Privacy and safety guard
 
   This is our reading of each vendor's public site in October 2026 and has not been checked with the vendors.
 - **The record has to last.** The Psychologists Act (Art. 25) requires practice records to be kept for at least 10 years. Notes that are wrong or invented stay wrong for a decade, so every sentence must be traceable.
-- **One card has to hold the whole system.** The case for a 32 GB card is not that a bigger model writes better notes: on our three short sessions the 8B model was faster than the 32B one and had more sentences pass the verifier (see [docs/RESULTS.md](docs/RESULTS.md)), and that count does not measure note quality either way. The case is that speech-to-text, the note model and the context of several 50-minute sessions must sit on one card at the same time. **Measured on 2026-11-14 (batch 9):** Whisper and Qwen3-32B (4-bit) loaded together on one B70 with a 32k context and an fp8 context cache; four 49.5-minute sessions drafted at once all finished in 280 s (one alone: 245 s), peak card memory 30.8 GiB, card power about 230 W. Speech-to-text was loaded but not exercised in that run. Details in [docs/RESULTS.md](docs/RESULTS.md).
+- **One card has to hold the whole system.** The case for a 32 GB card is not that a bigger model writes better notes: on our three short sessions the 8B model was faster than the 32B one and had more sentences pass the verifier (see [docs/RESULTS.md](docs/RESULTS.md)), and that count does not measure note quality either way. The case is that speech-to-text, the note model and the context of several 50-minute sessions must sit on one card at the same time. **Measured on 2026-11-14 (batch 9):** Whisper and Qwen3-32B (4-bit) loaded together on one B70 with a 32k context and an fp8 context cache; four 49.5-minute sessions drafted at once all finished in 280 s (one alone: 245 s); after the 2026-11-14 verifier and prompt fixes the notes are longer and four rooms took 365 s, two rooms 284 s. Peak card memory 30.8 GiB, card power about 230 W. Speech-to-text was loaded but not exercised in that run. Details in [docs/RESULTS.md](docs/RESULTS.md).
 
 ## How it works
 
@@ -296,8 +296,8 @@ Targets, with what has been measured so far. A target without a measurement is a
 
 | Metric | Target | Measured |
 | --- | --- | --- |
-| 50-minute session to draft note, including speech-to-text | ≤ 5 minutes | draft note 245 s from the finished transcript (32B); with speech-to-text pending |
-| Concurrent rooms, 50-minute sessions, Whisper on the same card | ≥ 4 | 4 rooms in 280 s (32B, from finished transcripts; speech-to-text loaded but idle) |
+| 50-minute session to draft note, including speech-to-text | ≤ 5 minutes | draft note 297 s from the finished transcript (32B, current code); with speech-to-text pending |
+| Concurrent rooms, 50-minute sessions, Whisper on the same card | ≥ 4 | 4 rooms in 365 s, 2 rooms in 284 s (32B, current code, from finished transcripts; speech-to-text loaded but idle) |
 | Peak memory and power draw under that load | – | 30.8 GiB of 32, about 230 W for the card (57 W idle) |
 | Character error rate | ≤ 10% | 14.1% on one 23-second clip; a longer recording is pending |
 | Note sentences backed by the transcript, as judged by a clinician | ≥ 95% | pending (needs the clinician's reading of flagged sentences) |
