@@ -22,7 +22,7 @@ What this does and does not claim is spelled out under "Privacy and safety guard
 
   This is our reading of each vendor's public site in October 2026 and has not been checked with the vendors.
 - **The record has to last.** The Psychologists Act (Art. 25) requires practice records to be kept for at least 10 years. Notes that are wrong or invented stay wrong for a decade, so every sentence must be traceable.
-- **One card has to hold the whole system.** The case for a 32 GB card is not that a bigger model writes better notes: on our three short sessions the 8B model was faster than the 32B one and had more sentences pass the verifier (see [docs/RESULTS.md](docs/RESULTS.md)), and that count does not measure note quality either way. The case is that speech-to-text, the note model and the context of several 50-minute sessions must sit on one card at the same time. **That has not been measured yet.** What is measured: Whisper and Qwen3-32B (4-bit) load together on one B70, and with both loaded about 4.9 GiB is left for the note model's context. Whether that is enough for one 50-minute session, let alone four rooms at once, is the open question; the measurement (peak memory and time for 1, 2 and 4 rooms, 8B against 32B, 16k against 32k context) is planned on the B70 and its numbers are pending.
+- **One card has to hold the whole system.** The case for a 32 GB card is not that a bigger model writes better notes: on our three short sessions the 8B model was faster than the 32B one and had more sentences pass the verifier (see [docs/RESULTS.md](docs/RESULTS.md)), and that count does not measure note quality either way. The case is that speech-to-text, the note model and the context of several 50-minute sessions must sit on one card at the same time. **Measured on 2026-11-14 (batch 9):** Whisper and Qwen3-32B (4-bit) loaded together on one B70 with a 32k context and an fp8 context cache; four 49.5-minute sessions drafted at once all finished in 280 s (one alone: 245 s), peak card memory 30.8 GiB, card power about 230 W. Speech-to-text was loaded but not exercised in that run. Details in [docs/RESULTS.md](docs/RESULTS.md).
 
 ## How it works
 
@@ -76,7 +76,7 @@ The memory figures are from the launcher's measured notes (`scripts/b70-vllm.sh`
 | Notes on a laptop | qwen2.5:7b through Ollama | 7B, Ollama's default 4-bit | not measured | Ollama default | Apache-2.0 |
 | Speech-to-text on a laptop | faster-whisper `small` | int8, CPU | not measured | – | MIT |
 
-Served by vLLM 0.26.0 (`vllm/vllm-openai-xpu:v0.26.0`). The 16,384-token context is too small for a 50-minute session in one request, which is why the writer works in parts of 60 segments; a 32k setting is part of the pending B70 measurement.
+Served by vLLM 0.26.0 (`vllm/vllm-openai-xpu:v0.26.0`). The writer works in parts of 60 segments, so a 50-minute session never needs one long request. Batch 9 (2026-11-14) ran with `--max-model-len 32768 --kv-cache-dtype fp8`, which both Qwen3-32B and Qwen3-8B accepted with Whisper on the same card.
 
 | Agent | What it does | Where |
 | --- | --- | --- |
@@ -296,9 +296,9 @@ Targets, with what has been measured so far. A target without a measurement is a
 
 | Metric | Target | Measured |
 | --- | --- | --- |
-| 50-minute session to draft note, including speech-to-text | ≤ 5 minutes | pending (only 2–4 minute sessions, without speech-to-text: 12–29 s) |
-| Concurrent rooms, 50-minute sessions, Whisper on the same card | ≥ 4 | pending |
-| Peak memory and power draw under that load | – | pending |
+| 50-minute session to draft note, including speech-to-text | ≤ 5 minutes | draft note 245 s from the finished transcript (32B); with speech-to-text pending |
+| Concurrent rooms, 50-minute sessions, Whisper on the same card | ≥ 4 | 4 rooms in 280 s (32B, from finished transcripts; speech-to-text loaded but idle) |
+| Peak memory and power draw under that load | – | 30.8 GiB of 32, about 230 W for the card (57 W idle) |
 | Character error rate | ≤ 10% | 14.1% on one 23-second clip; a longer recording is pending |
 | Note sentences backed by the transcript, as judged by a clinician | ≥ 95% | pending (needs the clinician's reading of flagged sentences) |
 | Risk-cue recall vs. psychologist labels | ≥ 90% | pending (no psychologist-labelled set yet; see Limitations) |

@@ -25,9 +25,36 @@ Known limits of these runs: single runs (a second run of C002-S05 on 32B gave 5/
 
 With Whisper on the same card (from the launcher's notes, `scripts/b70-vllm.sh`): 24.5 of 30.3 GiB free after Whisper loads; the 32B model at `UTIL=0.8` gets 18.1 GiB of weights and 4.9 GiB of context cache.
 
+## Batch 9: the whole system on one Arc Pro B70 (2026-11-14, commit 9829a27)
+
+One card, Whisper large-v3-turbo loaded beside the note model (`UTIL=0.12` and `0.8`), vLLM 0.26.0, context **32,768 tokens with an fp8 context cache** (both models started with it). Power and memory are the whole card's, sampled about once a second with `xpu-smi`, both servers loaded. Speech-to-text was loaded but not exercised: every run starts from a finished transcript. Summary and per-step logs: [b70-batch9/20261114-0742/summary.md](b70-batch9/20261114-0742/summary.md).
+
+| | Qwen3-32B AWQ | Qwen3-8B bf16 |
+| --- | --- | --- |
+| Card idle, no servers | 57 W | – |
+| Card with both servers loaded, idle | 57 W, 30.4 GiB | 58 W, 30.6 GiB |
+| Weights | 18.14 GiB | – |
+| Demo sessions (2–4 min), draft note time, median of 3 runs | 27.1 / 31.9 / 16.5 s | 20.1 / 28.5 / 11.7 s |
+| Output tok/s per session | 25–26 | 34 |
+| C002-L50 (49.5 min, 339 segments), one room | 244.9 s | 211.7 s |
+| C002-L50, 2 rooms at once, all done | 261.7 s | 208.3 s |
+| C002-L50, 4 rooms at once, all done | 279.5 s | 244.9 s |
+| Card power while drafting (step mean) | 229–233 W | 202–219 W |
+| Peak card memory during the steps | 30.8 GiB | 30.7 GiB |
+| Verifier test set, current rules (2026.11-4) | 30/30 wrong blocked, 1/18 correct blocked | 30/30, 2/18 |
+
+Sources: `benchmarks/b70-qwen3-{32b-awq,8b}-*-20261114-0742.md` (+ .json, -review.csv), `verifier-eval/b70-qwen3-{32b-awq,8b}-20261114-0742.md` (+ .json).
+
+Energy: one 49.5-minute session alone takes 230 W × 245 s ≈ 15.7 Wh of card energy; four at once take 230 W × 280 s ÷ 4 ≈ 4.5 Wh each. Card only, not the whole machine. vLLM reports that at 32k tokens per request the 32B cache holds 1.24 requests at once; the four rooms still finished within 14% of one room's time because the note is written in parts of 60 segments, far below 32k each.
+
+**"Passed the verifier" varies widely between runs of the same session and must not be quoted from one run.** 32B on C002-L50 over nine runs (three alone, six in 2- and 4-room runs): 42–88 of 92–120 sentences, with no link to how many rooms ran (alone: 88, 68, 53; together: 42–78) and no verifier timeouts (verifier 21–33 s in every run). Two causes, both fixed after this batch (verifier rules 2026.11-5), neither yet re-measured:
+
+1. *Pronoun rule.* 「個案表示當他嘗試…」 over the client's own 「我…」 was held as an unknown pronoun: 11–22 sentences per run, 344 over all 18 runs of both models. The rule now lets 他/她 through when the cited lines are all the client's (confirmed speakers), say 我, contain no 他/她, and the sentence is not about risk. Re-checked against the batch-9 sentences, 326 of the 344 no longer stop at this rule (they still face the overlap and model checks).
+2. *Invented observations.* In the low runs the local model rejected 23–35 sentences such as 「語氣中透露出成就感」 or 「表現出思索的神情」: tone and expression a transcript cannot show. The verifier was right; the writer's O-section instruction gave 「語速」 as an example. It now says to write only what the transcript text shows and to leave tone, pace, expression and inferred affect to the therapist.
+
 ## One long session on the B70 (2026-11-10, before the fixes)
 
-C002-L50 is a simulated session of 36.4 minutes by its timestamps (339 segments), written by Qwen3-32B with `scripts/make_long_session.py` ([data/sessions/C002-L50.json](../data/sessions/C002-L50.json)). Qwen3-32B AWQ drafted and verified the note from the finished transcript in **63.9 s** (writer 52.0 s, verifier 11.9 s, 21.8 output tok/s); 10 of 25 sentences passed the verifier. Source: [benchmarks/tmp-l36.md](benchmarks/tmp-l36.md) (+ .json, and the 15 held sentences in `tmp-l36-review.csv`, not yet judged by a clinician).
+The run's file reports 2181.5 s (36.4 minutes) of speech; the copy of C002-L50 now in the repository ends at 2967.4 s (49.5 minutes, 339 segments), so this run used an earlier version of the session. It was written by Qwen3-32B with `scripts/make_long_session.py` ([data/sessions/C002-L50.json](../data/sessions/C002-L50.json)). Qwen3-32B AWQ drafted and verified the note from the finished transcript in **63.9 s** (writer 52.0 s, verifier 11.9 s, 21.8 output tok/s); 10 of 25 sentences passed the verifier. Source: [benchmarks/tmp-l36.md](benchmarks/tmp-l36.md) (+ .json, and the 15 held sentences in `tmp-l36-review.csv`, not yet judged by a clinician).
 
 This is where "a 36-minute session in 64 s" comes from. Limits: one run; made with commit 6cf8441, before the 2026-11-12 fixes (the chunked writer for long sessions and the current verifier rules did not exist yet); speech-to-text not included; Whisper was served on the same card (the speech-to-text check above ran seven minutes earlier) but was idle during this run; 16k context; peak memory was not recorded. Rerun under the current code before quoting it.
 
@@ -65,9 +92,9 @@ One clip, 23.0 s, three utterances, on the B70 (2026-11-10, before the fixes): c
 
 | Measurement | Why it matters |
 | --- | --- |
-| Whisper + note model on one card, 50-minute session, 1 / 2 / 4 rooms: time and peak memory; 8B against 32B; 16k against 32k context with `--kv-cache-dtype fp8` | Whether one 32 GB card holds the whole system. Nothing in this file answers that yet |
-| Power draw during that load (`xpu-smi`) | Cost per session |
-| Verifier test set with 14B and 32B under the current rules; `benchmark.py --repeat 3` with the flagged-sentence review sheet | Comparable figures; separates real errors from correct sentences held back |
+| Batch 9 again under verifier rules 2026.11-5 and the new O-section prompt, C002-L50 three times | Whether the two fixes narrow the 42–88 spread; until then no pass rate from batch 9 is quoted |
+| Clinical review of the batch-9 review sheets (`*-20261114-0742-review.csv`) | Separates real errors from correct sentences held back |
+| A 50-minute session through Whisper while the note model runs | Speech-to-text was loaded in batch 9 but not exercised |
 | A recording of 10 minutes or more through Whisper | Real-time factor, error rate, recording-to-draft time |
 | Packet capture with the network cable pulled | The "0 outbound connections" target |
 | The launcher's new options (`OFFLINE`, `PRIVILEGED=0`, no `--trust-remote-code`) | They are untested |

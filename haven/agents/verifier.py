@@ -36,7 +36,7 @@ SUPPORTED = 0.5
 WEAK = 0.25
 # Stored with every signed note and with the cached verdicts. Change it whenever
 # a rule changes, so a verdict from older rules is never reused.
-VERIFIER_VERSION = "2026.11-4"
+VERIFIER_VERSION = "2026.11-5"
 MEASURE_MISMATCH = "量表句與系統依量表資料產生的內容不符。量表句不可修改：請還原，或改寫成引用逐字稿的句子"
 
 _TIME = re.compile(r"這週|下週|上週|本週|今天|明天|昨天|下次|上次|每天|每週|週[一二三四五六日]")
@@ -89,8 +89,19 @@ _INSTRUCTION = re.compile(
 INSTRUCTION_REASON = "引用的段落含有像是對 AI 下指令的話（例如要求在紀錄寫入特定內容），請對照錄音確認這是會談內容，再決定是否保留"
 
 
-def rule_violation(sentence: str, source: str) -> str:
-    """Returns why the sentence states a detail its source does not, or ''."""
+def refers_to_client(sentence: str, source: str, client_only: bool) -> bool:
+    """「個案表示當他…」over the client's own 「我…」: the pronoun can only mean the
+    client. Seen 20 times in one 50-minute Qwen3-32B note (batch 9), every one
+    blocked. Allowed only when the cited lines are all the client's (confirmed
+    speakers), say 我, name nobody else with 他/她, and the sentence is not about
+    risk: in 「我媽說不想活了」 written as 「個案表示她不想活了」 she may be the mother."""
+    return (client_only and sentence.startswith("個案") and "我" in source
+            and not _PRONOUN.search(source) and not _RISK_TERM.search(sentence))
+
+
+def rule_violation(sentence: str, source: str, client_only: bool = False) -> str:
+    """Returns why the sentence states a detail its source does not, or ''.
+    ``client_only``: every cited line is the client's, with confirmed speakers."""
     for word, same in _SAME_TIME.items():
         sentence, source = sentence.replace(word, same), source.replace(word, same)
     for token in _TIME.findall(sentence):
@@ -99,8 +110,9 @@ def rule_violation(sentence: str, source: str) -> str:
     for token in _NUMBER.findall(sentence):
         if token not in source:
             return f"數字「{token}」不在引用的逐字稿中"
+    self_ref = refers_to_client(sentence, source, client_only)
     for token in set(_PRONOUN.findall(sentence)):
-        if token not in source:
+        if token not in source and not self_ref:
             return f"代名詞「{token}」不在引用的逐字稿中，請確認指的是誰"
     aligned = set()
     for m in _POLAR_TERM.finditer(sentence):
@@ -206,7 +218,8 @@ class Verifier:
                 s.status, s.support, s.reason = "unsupported", 0.0, "句子寫心理師的看法或建議，但引用的都是個案的話" + ("（說話者為模型推測）" if any(segs[e].speaker_source not in CONFIRMED for e in s.evidence) else "")
                 continue
             s.support = round(max(overlap(s.text, c) for c in cited), 2)
-            violation = rule_violation(s.text, source)
+            client_only = all(segs[e].speaker == "client" and segs[e].speaker_source in CONFIRMED for e in s.evidence)
+            violation = rule_violation(s.text, source, client_only)
             if violation:
                 s.status, s.reason = "unsupported", violation
             elif s.support >= SUPPORTED and unbacked_clause(s.text, source):

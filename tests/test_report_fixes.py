@@ -185,5 +185,43 @@ class SpeakerConfirmTest(ServerCase, unittest.TestCase):
         self.assertEqual(self.call("/api/sessions/C002-S05/speakers", {"speakers": {"1": "client"}})[0], 409)
 
 
+class ClientPronounTest(unittest.TestCase):
+    """Batch 9: 「個案表示當他…」 over the client's own 「我…」 was blocked 20 times in one
+    50-minute note. The pronoun can only mean the client there; elsewhere it still blocks."""
+
+    def test_he_meaning_the_client_passes_over_the_clients_own_words(self):
+        from haven.agents.verifier import rule_violation
+        s = "個案表示當他嘗試與內在聲音對話時，那個聲音會慢慢變小。"
+        src = "而且我發現，當我這樣做的時候，那個聲音反而會慢慢變小，不像以前那樣強烈。"
+        self.assertEqual(rule_violation(s, src, client_only=True), "")
+        self.assertIn("代名詞", rule_violation(s, src))  # guessed speakers or a therapist line: still held
+
+    def test_still_blocked_where_the_pronoun_may_mean_someone_else(self):
+        from haven.agents.verifier import rule_violation
+        # Risk: 她 may be the mother.
+        self.assertIn("代名詞", rule_violation("個案表示她不想活了。", "我媽說不想活了", client_only=True))
+        # The source names someone with 她.
+        self.assertIn("代名詞", rule_violation("個案表示他不想讓妹妹難過。", "我不想讓她難過", client_only=True))
+        # The sentence is not about the client.
+        self.assertIn("代名詞", rule_violation("妹妹是她的支持。", "我妹妹吧", client_only=True))
+        # No 我 in the source: nothing ties the pronoun to the client.
+        self.assertIn("代名詞", rule_violation("個案表示他最近常加班。", "最近常加班", client_only=True))
+
+    def test_verifier_uses_it_only_for_confirmed_client_lines(self):
+        from haven.models import Note, NoteSentence, Segment, Transcript
+        line = "我發現，當我這樣做的時候，那個聲音反而會慢慢變小。"
+        s = "個案表示當他這樣做的時候，那個聲音會慢慢變小。"
+
+        def status(speaker, source):
+            t = Transcript("X-S01", "X", 1, "2026-11-14", [Segment(1, 0.0, 5.0, speaker, line, speaker_source=source)])
+            note = Note("SOAP", {"S": [NoteSentence(s, [1])]}, "test")
+            Verifier().run(note, t)
+            return note.sections["S"][0]
+
+        self.assertEqual(status("client", "confirmed").status, "supported")
+        self.assertIn("代名詞", status("client", "model").reason)
+        self.assertEqual(status("therapist", "confirmed").status, "unsupported")  # caught one rule earlier
+
+
 if __name__ == "__main__":
     unittest.main()

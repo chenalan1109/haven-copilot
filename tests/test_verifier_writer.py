@@ -350,13 +350,16 @@ class RuleEngineRiskTest(unittest.TestCase):
 
 
 class PromptTest(unittest.TestCase):
-    """2.9: CLN-I15. O is the clinician's observation of behaviour and affect, still cited."""
+    """2.9: CLN-I15. O is observed behaviour, still cited. Batch 9: only what the
+    transcript text shows; tone, pace, expression and inferred affect are the therapist's to add."""
 
     def test_objective_section_definition(self):
         o = TEMPLATES["SOAP"]["O"]
-        self.assertIn("行為與情緒表現", o)
+        self.assertIn("行為", o)
         self.assertIn("引用", o)
-        self.assertNotIn("說出的觀察", o)
+        for word in ("語氣", "語速", "神情", "語氣中透露出"):
+            self.assertIn(word, o.split("一律不要寫")[0])  # listed among what not to write
+        self.assertIn("語速", TEMPLATES["DAP"]["D"].split("不要寫")[0])
 
     def test_prompt_tells_the_model_about_proposals_and_risk_section(self):
         from haven.agents.writer import SYSTEM_PROMPT, _prompt

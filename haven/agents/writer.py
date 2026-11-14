@@ -29,15 +29,20 @@ TEMPLATES = {
         "S": "主觀資料（個案自述的困擾、感受、症狀、睡眠、體重、作業完成情形）",
         # SOAP's O is what the clinician observes. The transcript is all the model has, so
         # each observation still cites the lines it shows in; the rest the therapist adds.
-        "O": ("客觀資料（心理師對個案在會談中的行為與情緒表現的觀察，例如哭泣、沉默、語速、坐立不安；"
-              "每句都要引用看得出這項觀察的段落，逐字稿看不出來的不要寫；量表分數由系統自動填入，不要寫；沒有就留空陣列）"),
+        # Batch 9: with 「語速」 as an example, Qwen3-32B wrote up to 35 lines like
+        # 「語氣中透露出成就感」「表現出思索的神情」 per 50-minute note; a transcript
+        # shows neither, and the verifier rightly held them all.
+        "O": ("客觀資料（只寫逐字稿文字本身看得到的行為：逐字稿標註的哭泣、沉默、笑，或心理師說出口的觀察，"
+              "例如心理師說「我注意到你講到這裡停了很久」；語氣、語速、表情、神情、肢體動作，"
+              "以及從說話內容推測的情緒（例如「語氣中透露出…」）一律不要寫，這些由心理師自己補；"
+              "每句都要引用那個段落；量表分數由系統自動填入，不要寫；沒有就留空陣列，寧可少寫）"),
         "A": _A,
         "P": _P,
         "R": _R,
     },
     "DAP": {
-        "D": ("資料（個案自述，以及心理師對個案在會談中的行為與情緒表現的觀察，觀察要引用看得出來的段落；"
-              "量表分數由系統自動填入，不要寫）"),
+        "D": ("資料（個案自述，以及逐字稿文字本身看得到的行為：逐字稿標註的哭泣、沉默，或心理師說出口的觀察；"
+              "語氣、語速、表情、神情與推測的情緒不要寫；量表分數由系統自動填入，不要寫）"),
         "A": _A,
         "P": _P,
         "R": _R,
