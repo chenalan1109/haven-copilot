@@ -369,6 +369,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._process(sid, query)
             if parts[3] == "verify":
                 return self._verify(sid)
+            if parts[3] == "restore":
+                return self._restore(sid)
             if parts[3] == "sign":
                 return self._sign(sid)
             if parts[3] == "addendum":
@@ -409,15 +411,40 @@ class Handler(BaseHTTPRequestHandler):
 
     def _verify(self, sid):
         """Re-checks the note as the therapist has edited it. Only the sentence
-        texts, their citations and the confirmations are read from the request."""
+        texts, their citations and the confirmations are read from the request.
+        The checked note is also saved as the working draft (N10: closing the page
+        used to lose every edit); the AI's own draft is kept beside it."""
         payload = self._payload()
-        result, transcript, measures = _draft(sid)
-        note, verification, _ = signing.check(sid, transcript, payload, result["note"]["template"], result["note"].get("engine", ""), measures, ORCH.verifier)
-        signing.remember(sid, note, verification.get("llm_failed", False), by_model=ORCH.verifier.llm is not None)
-        store.audit("verify", f"{sid} {verification['supported']}/{verification['total']} supported"
+        dismissals = signing.parse_dismissals(payload.get("risk_dismissals") if isinstance(payload, dict) else None)
+        with _session_lock(sid):
+            result, transcript, measures = _draft(sid)
+            note, verification, _ = signing.check(sid, transcript, payload, result["note"]["template"], result["note"].get("engine", ""), measures, ORCH.verifier)
+            signing.remember(sid, note, verification.get("llm_failed", False), by_model=ORCH.verifier.llm is not None)
+            known = {f["segment_id"] for f in result["risk"].get("flags", [])}
+            uncovered = signing.uncovered_risk(result["risk"], note)
+            result.setdefault("ai_note", result["note"])
+            result["note"] = to_dict(note)
+            result["verification"] = verification
+            result["risk_uncovered"] = uncovered
+            result["draft_dismissals"] = [d for d in dismissals if d["segment_id"] in known]
+            result["draft_saved_at"] = store.now()
+            store.save_result(sid, result)
+        store.audit("verify", f"{sid} {verification['supported']}/{verification['total']} supported; draft saved"
                     + ("; local model did not answer" if verification.get("llm_failed") else ""))
-        return self._json({"note": to_dict(note), "verification": verification,
-                           "risk_uncovered": signing.uncovered_risk(result["risk"], note)})
+        return self._json({"note": to_dict(note), "verification": verification, "risk_uncovered": uncovered,
+                           "draft_saved_at": result["draft_saved_at"]})
+
+    def _restore(self, sid):
+        """Throws the working draft away and goes back to the note the AI wrote."""
+        with _session_lock(sid):
+            result, _, _ = _draft(sid)
+            if "ai_note" in result:
+                result["note"] = result.pop("ai_note")
+                for k in ("draft_dismissals", "draft_saved_at"):
+                    result.pop(k, None)
+                ORCH.refresh(result)  # verifies the AI draft again and saves it
+                store.audit("restore_ai_draft", sid)
+        return self._json(_session_view(sid))
 
     def _sign(self, sid):
         payload = self._payload()

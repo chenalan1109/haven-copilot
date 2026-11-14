@@ -62,6 +62,11 @@ class ForgedSignTest(ServerCase, unittest.TestCase):
 class MeasureLineTest(ServerCase, unittest.TestCase):
     """ENG-3, SEC-2, ENG-I2: score lines come from the questionnaire data only."""
 
+    def setUp(self):
+        # /verify saves the working draft; each test starts from the AI's own draft.
+        self.call("/api/sessions/C001-S04/open", {})
+        self.call("/api/sessions/C001-S04/restore", {})
+
     def test_fake_score_line_is_refused_at_signing(self):
         self.draft("C001-S04")
         status, _ = self.call("/api/sessions/C001-S04/sign", {"signed_by": "王", "note": {"sections": {

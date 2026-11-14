@@ -41,6 +41,7 @@ let session = null;          // the session result from the server, or null on t
 let sentences = {};          // section key -> [sentence state]; the note as the therapist has it now
 let nextKey = 1;             // each sentence gets a stable key; confirmations follow the key, not the words
 let edited = false;          // something would be lost by leaving this session
+let changeSeq = 0;           // goes up on every change; a save that covered the latest change clears `edited`
 let verifying = false;
 let verifyAgain = false;
 let verifyTimer = null;
@@ -183,7 +184,7 @@ function setStep(n) {
 // lives in this page until it is signed.
 function leaveOk() {
   if (!session || session.signed || !edited) return true;
-  return confirm("這份紀錄還沒簽核。離開後，修改過的句子、已確認保留的句子和不納入紀錄的理由都不會保存。確定離開？");
+  return confirm("有修改還沒驗證，所以還沒存檔。離開後這些修改會遺失（已驗證過的草稿已存檔）。確定離開？");
 }
 window.addEventListener("beforeunload", (e) => {
   if (session && !session.signed && edited) { e.preventDefault(); e.returnValue = ""; }
@@ -478,6 +479,11 @@ function highlight(ids, scroll = true) {
 
 // ----- the note as state -----
 
+function markChanged() {
+  edited = true;
+  changeSeq++;
+}
+
 function adoptNote(note) {
   sentences = {};
   for (const [key, items] of Object.entries(note.sections)) {
@@ -538,7 +544,8 @@ function notePayload() {
       };
     });
   }
-  return { payload: { template: session.note.template, sections }, keys, texts };
+  const risk_dismissals = [...dismissed].map(([segment_id, reason]) => ({ segment_id, reason }));
+  return { payload: { template: session.note.template, sections, risk_dismissals }, keys, texts };
 }
 
 function openRiskCues() {
@@ -638,7 +645,7 @@ function sentenceRow(sectionKey, s) {
 function onEdit(s, row) {
   const txt = row.querySelector(".txt");
   s.text = txt.textContent;
-  edited = true;
+  markChanged();
   confirmed.delete(s.key); // a confirmation was for the words as they were
   keepReasons.delete(s.key);
   const dirty = isDirty(s);
@@ -666,23 +673,25 @@ function keep(s) {
     askReason("保留沒有引用的句子", `「${s.text.trim()}」`, "這句的依據（例如：會談中觀察到的非語言行為、會談外取得的資訊）。會存進簽核紀錄和稽核紀錄。", (reason) => {
       keepReasons.set(s.key, reason);
       confirmed.add(s.key);
-      edited = true;
+      markChanged();
       renderNote();
       focusNextBlocking(false);
+      scheduleVerify(); // saves the working draft
     });
     return;
   }
   confirmed.add(s.key);
-  edited = true;
+  markChanged();
   renderNote();
   focusNextBlocking(false);
+  scheduleVerify(); // saves the working draft
 }
 
 function addSentence(sectionKey) {
   syncFromDom();
   const s = { key: nextKey++, text: "", verifiedText: "", evidence: [], status: "unchecked", source: "transcript", reason: "" };
   sentences[sectionKey].push(s);
-  edited = true;
+  markChanged();
   renderNote();
   const row = document.querySelector(`.sentence[data-key="${s.key}"] .txt`);
   if (row) row.focus();
@@ -693,7 +702,7 @@ function removeSentence(sectionKey, s) {
   if (s.text.trim() && !confirm(`刪除這一句？\n\n${s.text.trim()}`)) return;
   sentences[sectionKey] = sentences[sectionKey].filter((x) => x.key !== s.key);
   confirmed.delete(s.key);
-  edited = true;
+  markChanged();
   renderNote();
   // A deleted sentence may have been the only one citing a risk line: ask the server again.
   reverify();
@@ -703,7 +712,7 @@ function addTestSentence() {
   syncFromDom();
   const first = Object.keys(sentences)[0];
   sentences[first].push({ key: nextKey++, text: "個案表示與母親關係良好，最近常一起出遊。", verifiedText: "", evidence: [], status: "unchecked", source: "transcript", reason: "" });
-  edited = true;
+  markChanged();
   renderNote();
   reverify();
 }
@@ -801,6 +810,7 @@ function renderSummary() {
   if (c.blocking) parts.push(`還差 ${c.blocking} 句：請修改、刪除，或按「保留此句」。`);
   if (cues) parts.push(`還有 ${cues} 則風險線索沒有寫進紀錄。`);
   if (!parts.length) parts.push(c.kept ? `可以簽核（其中 ${c.kept} 句是您確認保留的標示句）。` : "每一句都通過查核，可以簽核。");
+  if (session.draft_saved_at && !edited) parts.push(`（草稿已存檔 ${session.draft_saved_at.slice(11, 16)}）`);
   bar.textContent = parts.join(" ");
   const blocked = signBlocked();
   const signBtn = document.getElementById("sign-btn");
@@ -833,9 +843,10 @@ function askReason(title, quote, label, done) {
 function dismissCue(u) {
   askReason("不納入紀錄的理由", `#${u.segment_id}（${u.category}）「${u.quote}」`, "理由（會寫入稽核紀錄）", (reason) => {
     dismissed.set(u.segment_id, reason);
-    edited = true;
+    markChanged();
     renderRiskGate();
     renderSummary();
+    scheduleVerify(); // saves the working draft
   });
 }
 
@@ -930,6 +941,13 @@ function renderSession(r, focusSeg) {
   edited = false;
   verifying = false;
   adoptNote(r.note);
+  if (!r.signed) { // a saved working draft brings back what the therapist had already confirmed
+    for (const s of allSentences()) {
+      if (s.confirmed_by_therapist) confirmed.add(s.key);
+      if (s.keep_reason) keepReasons.set(s.key, s.keep_reason);
+    }
+    for (const d of r.draft_dismissals || []) dismissed.set(d.segment_id, d.reason);
+  }
   const locked = !!r.signed;
   setSimNote(r.simulated === false ? "real" : "simulated");
   const main = document.getElementById("main");
@@ -979,7 +997,8 @@ function renderSession(r, focusSeg) {
       el("div", { class: "engine-line" },
         `${r.session_id}・這份${locked ? "紀錄的草稿" : "草稿"}由${engineName(r.engine)}產生`,
         differs ? `（先前產生的；目前設定的引擎是${engineName(serverStatus.engine)}）` : "",
-        differs ? el("button", { type: "button", class: "confirm", onclick: (e) => regenerate(e.currentTarget) }, "用目前的引擎重新產生") : null),
+        differs ? el("button", { type: "button", class: "confirm", onclick: (e) => regenerate(e.currentTarget) }, "用目前的引擎重新產生") : null,
+        !locked && r.draft_saved_at ? el("button", { type: "button", class: "confirm", title: "修改會自動存檔；這顆按鈕捨棄修改", onclick: (e) => restoreDraft(e.currentTarget) }, "還原成 AI 原稿") : null),
     ),
     el("div", { class: "timings", title: "各步驟花的時間。「載入逐字稿」是讀取已存的逐字稿，不是語音轉寫的時間。" },
       Object.entries(r.timings_ms || {}).map(([k, v]) => el("span", {}, `${AGENT_NAMES[k] || k} ${v >= 1000 ? `${(v / 1000).toFixed(1)} 秒` : `${v} 毫秒`}`))),
@@ -1005,6 +1024,20 @@ async function regenerate(btn) {
       renderSession(r);
     } catch (err) {
       if (my === nav) showMessage(`沒有重新產生：${err.message}`, true);
+    }
+  });
+}
+
+async function restoreDraft(btn) {
+  if (!confirm("捨棄您在這份草稿上的所有修改、確認和理由，回到 AI 寫的原稿？")) return;
+  const my = nav, sid = session.session_id;
+  await busy(btn, "還原中", async () => {
+    try {
+      const r = await post(`/api/sessions/${encodeURIComponent(sid)}/restore`);
+      if (my !== nav) return;
+      renderSession(r);
+    } catch (err) {
+      if (my === nav) showMessage(`沒有還原：${err.message}`, true);
     }
   });
 }
@@ -1060,6 +1093,7 @@ async function reverify() {
   const my = nav, sid = session.session_id;
   syncFromDom();
   const sent = notePayload();
+  const seqAtSend = changeSeq;
   verifying = true;
   verifyAgain = false;
   const btn = document.getElementById("verify-btn");
@@ -1097,6 +1131,9 @@ async function reverify() {
   }
   session.verification = r.verification;
   session.risk_uncovered = r.risk_uncovered;
+  // Saved on the server: nothing is lost by leaving, unless something changed while the request was out.
+  if (seqAtSend === changeSeq && !allSentences().some(isDirty)) edited = false;
+  session.draft_saved_at = r.draft_saved_at;
   showMessage("");
   renderRiskGate();
   renderNote();

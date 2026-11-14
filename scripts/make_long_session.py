@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from haven import config  # noqa: E402
+from haven.files import write_private  # noqa: E402
 from haven.llm import get_llm  # noqa: E402
 
 PARTS = [
@@ -73,7 +74,7 @@ def main() -> None:
         "segments": segments,
     }
     path = config.SESSIONS_DIR / "C002-L50.json"
-    path.write_text(json.dumps(session, ensure_ascii=False, indent=1), encoding="utf-8")
+    write_private(path, json.dumps(session, ensure_ascii=False, indent=1))  # 0600, like every session file Haven writes
     print(f"wrote {path}: {len(segments)} segments, {sum(len(s['text']) for s in segments)} characters, {clock / 60:.0f} minutes")
 
 

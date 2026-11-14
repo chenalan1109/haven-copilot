@@ -49,7 +49,9 @@ The README used to carry a second laptop table (63 / 44 / 37 s). No result file 
 | Qwen3-14B, B70 | 2026-11-07 | 26/30 | 0/18 | old meaning, old rules | [b70-vllm-qwen3-14b-fp8.md](verifier-eval/b70-vllm-qwen3-14b-fp8.md) (no .json) |
 | Qwen3-32B, B70 | 2026-11-07 | 26/30 | 0/18 | old meaning, old rules | [b70-vllm-qwen3-32b-awq.md](verifier-eval/b70-vllm-qwen3-32b-awq.md) (no .json) |
 
-The cases were written by the team that wrote the verifier. This is a regression check. The `rules-only` file was regenerated on 2026-11-12 under verifier rules 2026.11-4 (the rule that holds sentences citing an instruction-like line); the totals did not change.
+The cases were written by the team that wrote the verifier. This is a regression check.
+
+Without a model the rule layers hold back many correct sentences: in [rules-only.md](verifier-eval/rules-only.md) 13 of the 18 correct sentences are flagged for the therapist to check (2 of those block signing), because paraphrases share few words with the transcript. A local model is what keeps the therapist from rereading most of the note; that is the reason Haven needs one, and the figure behind it. The `rules-only` file was regenerated on 2026-11-12 under verifier rules 2026.11-4 (the rule that holds sentences citing an instruction-like line); the totals did not change.
 
 ## Risk cues (word matching, no model)
 

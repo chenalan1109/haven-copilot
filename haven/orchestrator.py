@@ -115,7 +115,10 @@ class Orchestrator:
         measures = self.measure_sentences(client, transcript.session_no)
         stored = result["note"]
         note = Note(stored["template"], {
-            k: [NoteSentence(s["text"], list(s.get("evidence", [])), source="measure" if s["text"] in measures and not s.get("evidence") else "transcript")
+            k: [NoteSentence(s["text"], list(s.get("evidence", [])), source="measure" if s["text"] in measures and not s.get("evidence") else "transcript",
+                             # The therapist's own confirmations in a saved working draft survive a re-check.
+                             confirmed_by_therapist=s.get("confirmed_by_therapist") is True,
+                             keep_reason=s.get("keep_reason", "") if isinstance(s.get("keep_reason"), str) else "")
                 for s in items]
             for k, items in stored["sections"].items()
         }, stored.get("engine", ""), stored.get("warnings", []))

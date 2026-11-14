@@ -43,6 +43,10 @@ def _now() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
+def now() -> str:
+    return _now()
+
+
 class AlreadySignedError(Exception):
     pass
 

@@ -113,5 +113,44 @@ class SingleCharacterTopicTest(ServerCase, unittest.TestCase):
         self.assertTrue(all("貓" in h["text"] for h in hits))
 
 
+class DraftAutosaveTest(ServerCase, unittest.TestCase):
+    """N10: closing the page lost every edit. /verify now saves the working draft."""
+
+    def test_edits_confirmations_and_reasons_come_back_and_restore_discards_them(self):
+        _, note = self.draft("C001-S04")
+        ai_texts = [s["text"] for s in note["sections"]["P"]]
+        for s in note["sections"]["P"]:
+            if s["text"] == "安排下週五提前會談。" or "提前" in s["text"]:
+                s["text"] = "下次會談提前到這週五。"
+        note["sections"]["S"].append({"text": "個案今天比平常早到十分鐘。", "evidence": [],
+                                      "confirmed_by_therapist": True, "keep_reason": "心理師觀察"})
+        _, r = self.call("/api/sessions/C001-S04")
+        flag = next(f for f in r["risk"]["flags"] if f["level"] in ("high", "critical"))
+        note["risk_dismissals"] = [{"segment_id": flag["segment_id"], "reason": "已口頭處理，另案記錄"},
+                                   {"segment_id": 9999, "reason": "不存在的段落"}]
+        status, v = self.call("/api/sessions/C001-S04/verify", note)
+        self.assertEqual(status, 200)
+        self.assertTrue(v["draft_saved_at"])
+        # Reopening (a new page) shows the saved working draft.
+        _, again = self.call("/api/sessions/C001-S04/open", {})
+        texts = [s["text"] for k in again["note"]["sections"] for s in again["note"]["sections"][k]]
+        self.assertIn("下次會談提前到這週五。", texts)
+        kept = next(s for s in again["note"]["sections"]["S"] if s["text"] == "個案今天比平常早到十分鐘。")
+        self.assertTrue(kept["confirmed_by_therapist"])
+        self.assertEqual(kept["keep_reason"], "心理師觀察")
+        self.assertEqual(again["draft_dismissals"], [{"segment_id": flag["segment_id"], "reason": "已口頭處理，另案記錄"}])
+        # Restore goes back to the AI's note.
+        _, back = self.call("/api/sessions/C001-S04/restore", {})
+        self.assertEqual([s["text"] for s in back["note"]["sections"]["P"]], ai_texts)
+        self.assertNotIn("draft_saved_at", back)
+        self.assertNotIn("ai_note", back)
+
+    def test_restore_after_signing_is_refused(self):
+        _, note = self.draft("C002-S05")
+        self.call("/api/sessions/C002-S05/verify", note)
+        self.assertEqual(self.call("/api/sessions/C002-S05/sign", {"signed_by": "王", "note": note})[0], 200)
+        self.assertEqual(self.call("/api/sessions/C002-S05/restore", {})[0], 409)
+
+
 if __name__ == "__main__":
     unittest.main()

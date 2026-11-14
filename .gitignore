@@ -17,3 +17,6 @@ data/**/*.tmp
 data/tmp/
 data/audio/*
 !data/audio/.gitkeep
+# Written on the B70 copy by the sync, so results there name the commit they ran on.
+SYNCED_COMMIT
+batch9.log
