@@ -1,0 +1,29 @@
+- 07:42:01 monitor: xpu-smi dump on card 0 -> docs/b70-batch9/20261114-0742/monitor.csv
+- 07:42:01 idle baseline: 30 s
+- 07:42:32 starting Whisper
+- 07:44:48 starting qwen3-32b-awq: 32k context, fp8 context cache
+- 07:46:54 qwen3-32b-awq ready (32768, fp8 cache)
+- 07:47:14 step qwen3-32b-awq-verifier: python3 scripts/verifier_eval.py --label b70-qwen3-32b-awq-20261114-0742
+- 07:47:26 step qwen3-32b-awq-verifier finished (exit 0)
+- 07:47:26 step qwen3-32b-awq-repeat3: python3 scripts/benchmark.py --repeat 3 --label b70-qwen3-32b-awq-repeat3-20261114-0742
+- 07:51:16 step qwen3-32b-awq-repeat3 finished (exit 0)
+- 07:51:16 step qwen3-32b-awq-long-1room: python3 scripts/benchmark.py --sessions C002-L50 --label b70-qwen3-32b-awq-L50-20261114-0742
+- 07:55:21 step qwen3-32b-awq-long-1room finished (exit 0)
+- 07:55:21 step qwen3-32b-awq-long-2rooms: python3 scripts/benchmark.py --sessions C002-L50 --rooms 2 --label b70-qwen3-32b-awq-L50-2rooms-20261114-0742
+- 08:03:28 step qwen3-32b-awq-long-2rooms finished (exit 0)
+- 08:03:28 step qwen3-32b-awq-long-4rooms: python3 scripts/benchmark.py --sessions C002-L50 --rooms 4 --label b70-qwen3-32b-awq-L50-4rooms-20261114-0742
+- 08:11:51 step qwen3-32b-awq-long-4rooms finished (exit 0)
+- 08:11:53 starting Whisper
+- 08:14:09 starting qwen3-8b: 32k context, fp8 context cache
+- 08:16:10 qwen3-8b ready (32768, fp8 cache)
+- 08:16:30 step qwen3-8b-verifier: python3 scripts/verifier_eval.py --label b70-qwen3-8b-20261114-0742
+- 08:16:39 step qwen3-8b-verifier finished (exit 0)
+- 08:16:39 step qwen3-8b-repeat3: python3 scripts/benchmark.py --repeat 3 --label b70-qwen3-8b-repeat3-20261114-0742
+- 08:19:49 step qwen3-8b-repeat3 finished (exit 0)
+- 08:19:49 step qwen3-8b-long-1room: python3 scripts/benchmark.py --sessions C002-L50 --label b70-qwen3-8b-L50-20261114-0742
+- 08:23:21 step qwen3-8b-long-1room finished (exit 0)
+- 08:23:21 step qwen3-8b-long-2rooms: python3 scripts/benchmark.py --sessions C002-L50 --rooms 2 --label b70-qwen3-8b-L50-2rooms-20261114-0742
+- 08:30:22 step qwen3-8b-long-2rooms finished (exit 0)
+- 08:30:22 step qwen3-8b-long-4rooms: python3 scripts/benchmark.py --sessions C002-L50 --rooms 4 --label b70-qwen3-8b-L50-4rooms-20261114-0742
+- 08:37:49 step qwen3-8b-long-4rooms finished (exit 0)
+- 08:37:49 done: docs/b70-batch9/20261114-0742/summary.md

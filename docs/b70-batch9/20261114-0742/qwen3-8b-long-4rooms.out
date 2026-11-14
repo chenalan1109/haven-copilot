@@ -1,0 +1,4 @@
+engine: openai-compat:qwen3-8b
+  C002-L50 run 1: 201.2s, 34.4 tok/s, 78/129 supported
+  4 rooms at once: all done in 244.9s, 115.3 output tok/s in total
+wrote docs/benchmarks/b70-qwen3-8b-L50-4rooms-20261114-0742.json, .md and -review.csv (51 flagged sentences)

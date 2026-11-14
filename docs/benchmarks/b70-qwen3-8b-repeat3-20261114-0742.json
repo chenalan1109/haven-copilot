@@ -1,0 +1,616 @@
+{
+  "label": "b70-qwen3-8b-repeat3-20261114-0742",
+  "date": "2026-11-14T08:19:49+00:00",
+  "engine": "openai-compat:qwen3-8b",
+  "llm_endpoint": "http://127.0.0.1:8000",
+  "machine": {
+    "system": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+    "processor": ""
+  },
+  "repeats": 3,
+  "sequential": [
+    {
+      "session_id": "C001-S03",
+      "repeats": 3,
+      "speech_seconds": 230.0,
+      "total_seconds": 20.1,
+      "agents_ms": {
+        "asr": 0.1,
+        "writer": 17696.4,
+        "verifier": 2122.5,
+        "risk": 1.9,
+        "outcome": 0.1
+      },
+      "output_tokens_per_second": 33.8,
+      "sentences_supported": 11,
+      "sentences_supported_range": [
+        9,
+        12
+      ],
+      "sentences_total": 14,
+      "runs": [
+        {
+          "session_id": "C001-S03",
+          "speech_seconds": 230.0,
+          "total_seconds": 20.1,
+          "agents_ms": {
+            "asr": 0.1,
+            "writer": 17925.9,
+            "verifier": 2122.5,
+            "risk": 1.9,
+            "outcome": 0.1
+          },
+          "llm_calls": 2,
+          "prompt_tokens": 2126,
+          "completion_tokens": 674,
+          "output_tokens_per_second": 33.6,
+          "sentences_supported": 11,
+          "sentences_total": 14,
+          "sentences_weak": 1,
+          "sentences_unsupported": 2,
+          "risk_level": "none",
+          "flagged": [
+            {
+              "section": "S",
+              "sentence": "個案表示工作壓力大，主管將新專案交給他，導致每天加班到九點多才回家。",
+              "status": "unsupported",
+              "reason": "代名詞「他」不在引用的逐字稿中，請確認指的是誰",
+              "must_confirm": false,
+              "cited": "[2] client: 還是很累，主管又把一個新專案丟給我，我每天都加班到九點多才回家。"
+            },
+            {
+              "section": "A",
+              "sentence": "心理師觀察到個案對主管的恐懼與對父親的反應有相似之處，認為這是一個重要的連結。",
+              "status": "unsupported",
+              "reason": "數字「一」不在引用的逐字稿中",
+              "must_confirm": false,
+              "cited": "[15] therapist: 不敢對主管說不，跟面對爸爸時的感覺，有沒有哪裡很像？ / [16] client: 好像有，都是怕對方失望，覺得如果拒絕的話，他們就會覺得我很沒用。"
+            },
+            {
+              "section": "R",
+              "sentence": "個案表示沒有自傷或自殺的計畫，但提到對工作和家庭的壓力感到非常負擔。",
+              "status": "weak",
+              "reason": "風險相關句只有本機模型判斷支持，請心理師對照原句確認",
+              "must_confirm": true,
+              "cited": "[1] therapist: 上次我們談到你在公司的壓力，這一週過得怎麼樣？ / [6] client: 會一直想工作做不完，還有想到我爸。他上週打電話來又說我選錯工作，說我讀那麼多書沒有用。 / [14] client: 嗯，我發現自己對主管其實也很怕，不敢說不。"
+            }
+          ]
+        },
+        {
+          "session_id": "C001-S03",
+          "speech_seconds": 230.0,
+          "total_seconds": 20.2,
+          "agents_ms": {
+            "asr": 0.1,
+            "writer": 17696.4,
+            "verifier": 2488.4,
+            "risk": 1.9,
+            "outcome": 0.1
+          },
+          "llm_calls": 2,
+          "prompt_tokens": 2213,
+          "completion_tokens": 687,
+          "output_tokens_per_second": 34.1,
+          "sentences_supported": 12,
+          "sentences_total": 14,
+          "sentences_weak": 0,
+          "sentences_unsupported": 2,
+          "risk_level": "none",
+          "flagged": [
+            {
+              "section": "S",
+              "sentence": "個案表示工作壓力大，主管將新專案交給他，導致每天加班到九點多才回家。",
+              "status": "unsupported",
+              "reason": "代名詞「他」不在引用的逐字稿中，請確認指的是誰",
+              "must_confirm": false,
+              "cited": "[2] client: 還是很累，主管又把一個新專案丟給我，我每天都加班到九點多才回家。"
+            },
+            {
+              "section": "R",
+              "sentence": "個案表示沒有自傷或自殺的計畫，但提到對工作和家庭的壓力感到非常負擔。",
+              "status": "unsupported",
+              "reason": "本機模型判斷引用段落不足以支持此句",
+              "must_confirm": false,
+              "cited": "[1] therapist: 上次我們談到你在公司的壓力，這一週過得怎麼樣？ / [6] client: 會一直想工作做不完，還有想到我爸。他上週打電話來又說我選錯工作，說我讀那麼多書沒有用。 / [14] client: 嗯，我發現自己對主管其實也很怕，不敢說不。"
+            }
+          ]
+        },
+        {
+          "session_id": "C001-S03",
+          "speech_seconds": 230.0,
+          "total_seconds": 16.1,
+          "agents_ms": {
+            "asr": 0.1,
+            "writer": 14271.8,
+            "verifier": 1811.9,
+            "risk": 1.9,
+            "outcome": 0.1
+          },
+          "llm_calls": 2,
+          "prompt_tokens": 1983,
+          "completion_tokens": 543,
+          "output_tokens_per_second": 33.8,
+          "sentences_supported": 9,
+          "sentences_total": 11,
+          "sentences_weak": 0,
+          "sentences_unsupported": 2,
+          "risk_level": "none",
+          "flagged": [
+            {
+              "section": "S",
+              "sentence": "個案表示工作壓力大，主管將新專案交給他，導致每天加班到九點多才回家。",
+              "status": "unsupported",
+              "reason": "代名詞「他」不在引用的逐字稿中，請確認指的是誰",
+              "must_confirm": false,
+              "cited": "[2] client: 還是很累，主管又把一個新專案丟給我，我每天都加班到九點多才回家。"
+            },
+            {
+              "section": "R",
+              "sentence": "個案表示沒有自傷或自殺的計畫，但提到對工作和家庭關係感到壓力。",
+              "status": "unsupported",
+              "reason": "風險相關句的否定語與逐字稿不一致，請確認語意沒有被反轉",
+              "must_confirm": false,
+              "cited": "[19] client: 好，我試試看。"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "session_id": "C001-S04",
+      "repeats": 3,
+      "speech_seconds": 232.0,
+      "total_seconds": 28.5,
+      "agents_ms": {
+        "asr": 0.1,
+        "writer": 24239.8,
+        "verifier": 4709.8,
+        "risk": 2.6,
+        "outcome": 0.1
+      },
+      "output_tokens_per_second": 34.3,
+      "sentences_supported": 12,
+      "sentences_supported_range": [
+        11,
+        19
+      ],
+      "sentences_total": 22,
+      "runs": [
+        {
+          "session_id": "C001-S04",
+          "speech_seconds": 232.0,
+          "total_seconds": 28.5,
+          "agents_ms": {
+            "asr": 0.1,
+            "writer": 23754.5,
+            "verifier": 4709.8,
+            "risk": 2.4,
+            "outcome": 0.0
+          },
+          "llm_calls": 2,
+          "prompt_tokens": 2501,
+          "completion_tokens": 969,
+          "output_tokens_per_second": 34.0,
+          "sentences_supported": 12,
+          "sentences_total": 19,
+          "sentences_weak": 2,
+          "sentences_unsupported": 5,
+          "risk_level": "high",
+          "flagged": [
+            {
+              "section": "S",
+              "sentence": "個案表示有想過結束自己的生命，但沒有具體計畫，只是晚上一個人的時候會有這個念頭。",
+              "status": "weak",
+              "reason": "風險相關句只有本機模型判斷支持，請心理師對照原句確認",
+              "must_confirm": true,
+              "cited": "[12] client: 有想過，但是沒有真的想要怎麼做，就是晚上一個人的時候會冒出來。"
+            },
+            {
+              "section": "O",
+              "sentence": "個案在談論被主管當眾罵時，語氣低沉，並表現出情緒低落。",
+              "status": "unsupported",
+              "reason": "本機模型判斷引用段落不足以支持此句",
+              "must_confirm": false,
+              "cited": "[2] client: 不太好，上週被主管當著大家的面罵，我那天就請假了，整天躺在床上。"
+            },
+            {
+              "section": "O",
+              "sentence": "個案在談論自己感到累和想結束生命時，語氣較為低沉，並有明顯的負面情緒。",
+              "status": "unsupported",
+              "reason": "風險相關句的否定語與逐字稿不一致，請確認語意沒有被反轉",
+              "must_confirm": false,
+              "cited": "[10] client: 有時候會覺得活著好累，會想說如果消失算了，大家可能也不會怎麼樣。"
+            },
+            {
+              "section": "O",
+              "sentence": "個案在談論自己對工作的感受時，語速較慢，並表現出對自己能力的否定。",
+              "status": "unsupported",
+              "reason": "本機模型判斷引用段落不足以支持此句",
+              "must_confirm": false,
+              "cited": "[4] client: 覺得自己很沒用，跟我爸說的一樣。我現在每天都覺得很累，對什麼事都提不起勁。"
+            },
+            {
+              "section": "A",
+              "sentence": "心理師認為個案目前處於情緒低落的狀態，並有自殺想法，但尚無具體計畫。",
+              "status": "unsupported",
+              "reason": "句子寫心理師的看法或建議，但引用的都是個案的話",
+              "must_confirm": false,
+              "cited": "[12] client: 有想過，但是沒有真的想要怎麼做，就是晚上一個人的時候會冒出來。"
+            },
+            {
+              "section": "A",
+              "sentence": "心理師觀察到個案對自己的負面評價，並有持續的睡眠與飲食問題。",
+              "status": "unsupported",
+              "reason": "句子寫心理師的看法或建議，但引用的都是個案的話",
+              "must_confirm": false,
+              "cited": "[4] client: 覺得自己很沒用，跟我爸說的一樣。我現在每天都覺得很累，對什麼事都提不起勁。 / [6] client: 幾乎睡不著，這兩週瘦了三公斤，吃東西都沒有味道。"
+            },
+            {
+              "section": "R",
+              "sentence": "個案表示有想過結束自己的生命，但沒有具體計畫。",
+              "status": "weak",
+              "reason": "風險相關句只有本機模型判斷支持，請心理師對照原句確認",
+              "must_confirm": true,
+              "cited": "[12] client: 有想過，但是沒有真的想要怎麼做，就是晚上一個人的時候會冒出來。"
+            }
+          ]
+        },
+        {
+          "session_id": "C001-S04",
+          "speech_seconds": 232.0,
+          "total_seconds": 41.7,
+          "agents_ms": {
+            "asr": 0.1,
+            "writer": 36333.9,
+            "verifier": 5358.7,
+            "risk": 2.6,
+            "outcome": 0.1
+          },
+          "llm_calls": 2,
+          "prompt_tokens": 2716,
+          "completion_tokens": 1434,
+          "output_tokens_per_second": 34.4,
+          "sentences_supported": 11,
+          "sentences_total": 29,
+          "sentences_weak": 9,
+          "sentences_unsupported": 9,
+          "risk_level": "high",
+          "flagged": [
+            {
+              "section": "S",
+              "sentence": "個案表示無法完成上週的作業，包括睡前不看工作訊息和寫思考紀錄。",
+              "status": "unsupported",
+              "reason": "時間詞「上週」不在引用的逐字稿中",
+              "must_confirm": false,
+              "cited": "[8] client: 沒有，根本做不到，思考紀錄也沒寫。"
+            },
+            {
+              "section": "S",
+              "sentence": "個案表示有時會覺得活著很累，並有想消失的念頭，但沒有具體計畫。",
+              "status": "weak",
+              "reason": "風險相關句只有本機模型判斷支持，請心理師對照原句確認",
+              "must_confirm": true,
+              "cited": "[10] client: 有時候會覺得活著好累，會想說如果消失算了，大家可能也不會怎麼樣。"
+            },
+            {
+              "section": "S",
+              "sentence": "個案表示有想過結束自己的生命，但沒有真的想要怎麼做，僅在晚上獨處時會出現這種念頭。",
+              "status": "weak",
+              "reason": "風險相關句只有本機模型判斷支持，請心理師對照原句確認",
+              "must_confirm": true,
+              "cited": "[12] client: 有想過，但是沒有真的想要怎麼做，就是晚上一個人的時候會冒出來。"
+            },
+            {
+              "section": "S",
+              "sentence": "個案表示這週有三、四個晚上會有想結束生命的念頭。",
+              "status": "weak",
+              "reason": "風險相關句只有本機模型判斷支持，請心理師對照原句確認",
+              "must_confirm": true,
+              "cited": "[14] client: 這週大概有三、四個晚上吧。"
+            },
+            {
+              "section": "S",
+              "sentence": "個案表示當有想結束生命的念頭時，會想到妹妹和貓，並因此勉強自己撐下去。",
+              "status": "unsupported",
+              "reason": "風險相關句的否定語與逐字稿不一致，請確認語意沒有被反轉",
+              "must_confirm": false,
+              "cited": "[16] client: 我妹妹吧，我不想讓她難過。還有我養的貓。"
+            },
+            {
+              "section": "O",
+              "sentence": "個案在談論被主管當眾罵時，語氣低沉，並表現出情緒低落。",
+              "status": "unsupported",
+              "reason": "本機模型判斷引用段落不足以支持此句",
+              "must_confirm": false,
+              "cited": "[2] client: 不太好，上週被主管當著大家的面罵，我那天就請假了，整天躺在床上。"
+            },
+            {
+              "section": "O",
+              "sentence": "個案在談論自己感到疲憊和情緒低落時，語氣緩慢，並表現出對未來的無望。",
+              "status": "unsupported",
+              "reason": "本機模型判斷引用段落不足以支持此句",
+              "must_confirm": false,
+              "cited": "[4] client: 覺得自己很沒用，跟我爸說的一樣。我現在每天都覺得很累，對什麼事都提不起勁。"
+            },
+            {
+              "section": "O",
+              "sentence": "個案在談論有想結束生命的念頭時，語氣低沉，並表現出對自己的無望。",
+              "status": "weak",
+              "reason": "風險相關句只有本機模型判斷支持，請心理師對照原句確認",
+              "must_confirm": true,
+              "cited": "[10] client: 有時候會覺得活著好累，會想說如果消失算了，大家可能也不會怎麼樣。"
+            },
+            {
+              "section": "O",
+              "sentence": "個案在談論有想結束生命的念頭時，語氣低沉，並表現出對自己的無望。",
+              "status": "weak",
+              "reason": "風險相關句只有本機模型判斷支持，請心理師對照原句確認",
+              "must_confirm": true,
+              "cited": "[12] client: 有想過，但是沒有真的想要怎麼做，就是晚上一個人的時候會冒出來。"
+            },
+            {
+              "section": "O",
+              "sentence": "個案在談論有想結束生命的念頭時，語氣低沉，並表現出對自己的無望。",
+              "status": "unsupported",
+              "reason": "風險相關句的否定語與逐字稿不一致，請確認語意沒有被反轉",
+              "must_confirm": false,
+              "cited": "[14] client: 這週大概有三、四個晚上吧。"
+            },
+            {
+              "section": "O",
+              "sentence": "個案在談論當有想結束生命的念頭時，會想到妹妹和貓，並因此勉強自己撐下去。",
+              "status": "unsupported",
+              "reason": "風險相關句的否定語與逐字稿不一致，請確認語意沒有被反轉",
+              "must_confirm": false,
+              "cited": "[16] client: 我妹妹吧，我不想讓她難過。還有我養的貓。"
+            },
+            {
+              "section": "A",
+              "sentence": "心理師觀察到個案近期情緒低落，並有持續的疲憊感，這可能與最近的壓力事件有關。",
+              "status": "unsupported",
+              "reason": "句子寫心理師的看法或建議，但引用的都是個案的話",
+              "must_confirm": false,
+              "cited": "[4] client: 覺得自己很沒用，跟我爸說的一樣。我現在每天都覺得很累，對什麼事都提不起勁。"
+            },
+            {
+              "section": "A",
+              "sentence": "心理師認為個案目前有輕度的自傷想法，但尚未有具體計畫，並建議進行進一步評估。",
+              "status": "unsupported",
+              "reason": "句子寫心理師的看法或建議，但引用的都是個案的話",
+              "must_confirm": false,
+              "cited": "[12] client: 有想過，但是沒有真的想要怎麼做，就是晚上一個人的時候會冒出來。"
+            },
+            {
+              "section": "A",
+              "sentence": "心理師認為個案目前有持續的自傷想法，並建議與身心科醫師評估睡眠和情緒狀況。",
+              "status": "weak",
+              "reason": "本機模型判斷引用段落不足以支持此句",
+              "must_confirm": true,
+              "cited": "[20] therapist: 另外，我會建議你去看身心科醫師評估睡眠和情緒，你願意嗎？"
+            },
+            {
+              "section": "A",
+              "sentence": "心理師認為個案目前有持續的自傷想法，並建議與身心科醫師評估睡眠和情緒狀況。",
+              "status": "weak",
+              "reason": "本機模型判斷引用段落不足以支持此句",
+              "must_confirm": true,
+              "cited": "[20] therapist: 另外，我會建議你去看身心科醫師評估睡眠和情緒，你願意嗎？"
+            },
+            {
+              "section": "R",
+              "sentence": "個案表示有想過結束自己的生命，但沒有具體計畫，僅在晚上獨處時會出現這種念頭。",
+              "status": "weak",
+              "reason": "風險相關句只有本機模型判斷支持，請心理師對照原句確認",
+              "must_confirm": true,
+              "cited": "[12] client: 有想過，但是沒有真的想要怎麼做，就是晚上一個人的時候會冒出來。"
+            },
+            {
+              "section": "R",
+              "sentence": "個案表示這週有三、四個晚上會有想結束生命的念頭。",
+              "status": "weak",
+              "reason": "風險相關句只有本機模型判斷支持，請心理師對照原句確認",
+              "must_confirm": true,
+              "cited": "[14] client: 這週大概有三、四個晚上吧。"
+            },
+            {
+              "section": "R",
+              "sentence": "個案表示當有想結束生命的念頭時，會想到妹妹和貓，並因此勉強自己撐下去。",
+              "status": "unsupported",
+              "reason": "風險相關句的否定語與逐字稿不一致，請確認語意沒有被反轉",
+              "must_confirm": false,
+              "cited": "[16] client: 我妹妹吧，我不想讓她難過。還有我養的貓。"
+            }
+          ]
+        },
+        {
+          "session_id": "C001-S04",
+          "speech_seconds": 232.0,
+          "total_seconds": 27.9,
+          "agents_ms": {
+            "asr": 0.1,
+            "writer": 24239.8,
+            "verifier": 3618.3,
+            "risk": 2.6,
+            "outcome": 0.1
+          },
+          "llm_calls": 2,
+          "prompt_tokens": 2313,
+          "completion_tokens": 955,
+          "output_tokens_per_second": 34.3,
+          "sentences_supported": 19,
+          "sentences_total": 22,
+          "sentences_weak": 1,
+          "sentences_unsupported": 2,
+          "risk_level": "high",
+          "flagged": [
+            {
+              "section": "A",
+              "sentence": "心理師認為個案最近的壓力事件（如被主管當眾罵）可能與情緒低落和睡眠問題有關。",
+              "status": "unsupported",
+              "reason": "句子寫心理師的看法或建議，但引用的都是個案的話",
+              "must_confirm": false,
+              "cited": "[2] client: 不太好，上週被主管當著大家的面罵，我那天就請假了，整天躺在床上。"
+            },
+            {
+              "section": "A",
+              "sentence": "心理師認為個案的自殺念頭雖然存在，但目前並未具體計畫，且個案有保護因子（如妹妹和貓）。",
+              "status": "unsupported",
+              "reason": "句子寫心理師的看法或建議，但引用的都是個案的話",
+              "must_confirm": false,
+              "cited": "[10] client: 有時候會覺得活著好累，會想說如果消失算了，大家可能也不會怎麼樣。 / [12] client: 有想過，但是沒有真的想要怎麼做，就是晚上一個人的時候會冒出來。 / [16] client: 我妹妹吧，我不想讓她難過。還有我養的貓。"
+            },
+            {
+              "section": "R",
+              "sentence": "個案表示有想過要結束自己的生命，但沒有具體計畫。",
+              "status": "weak",
+              "reason": "風險相關句只有本機模型判斷支持，請心理師對照原句確認",
+              "must_confirm": true,
+              "cited": "[12] client: 有想過，但是沒有真的想要怎麼做，就是晚上一個人的時候會冒出來。"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "session_id": "C002-S05",
+      "repeats": 3,
+      "speech_seconds": 110.0,
+      "total_seconds": 11.7,
+      "agents_ms": {
+        "asr": 0.1,
+        "writer": 10893.7,
+        "verifier": 793.0,
+        "risk": 1.1,
+        "outcome": 0.1
+      },
+      "output_tokens_per_second": 33.9,
+      "sentences_supported": 7,
+      "sentences_supported_range": [
+        6,
+        8
+      ],
+      "sentences_total": 9,
+      "runs": [
+        {
+          "session_id": "C002-S05",
+          "speech_seconds": 110.0,
+          "total_seconds": 11.7,
+          "agents_ms": {
+            "asr": 0.1,
+            "writer": 10859.7,
+            "verifier": 797.6,
+            "risk": 1.1,
+            "outcome": 0.1
+          },
+          "llm_calls": 2,
+          "prompt_tokens": 1540,
+          "completion_tokens": 392,
+          "output_tokens_per_second": 33.6,
+          "sentences_supported": 6,
+          "sentences_total": 9,
+          "sentences_weak": 0,
+          "sentences_unsupported": 3,
+          "risk_level": "none",
+          "flagged": [
+            {
+              "section": "S",
+              "sentence": "個案計畫下週在課堂上主動發問一次。",
+              "status": "unsupported",
+              "reason": "時間詞「下週」不在引用的逐字稿中",
+              "must_confirm": false,
+              "cited": "[10] client: 我想試試看在課堂上主動發問一次。"
+            },
+            {
+              "section": "O",
+              "sentence": "個案在談及上台報告時，語氣較為平靜，並提及講到後面較順。",
+              "status": "unsupported",
+              "reason": "本機模型判斷引用段落不足以支持此句",
+              "must_confirm": false,
+              "cited": "[2] client: 我有上台講了！雖然一開始手一直抖，但講到後面就比較順了。"
+            },
+            {
+              "section": "A",
+              "sentence": "心理師觀察到個案在談及同學反應時，語氣較為正面，顯示有改善的跡象。",
+              "status": "unsupported",
+              "reason": "句子寫心理師的看法或建議，但引用的都是個案的話",
+              "must_confirm": false,
+              "cited": "[6] client: 對，而且同學也沒有像我想像的那樣笑我，有一個同學還說我講得很清楚。"
+            }
+          ]
+        },
+        {
+          "session_id": "C002-S05",
+          "speech_seconds": 110.0,
+          "total_seconds": 11.7,
+          "agents_ms": {
+            "asr": 0.1,
+            "writer": 10893.7,
+            "verifier": 793.0,
+            "risk": 1.2,
+            "outcome": 0.1
+          },
+          "llm_calls": 2,
+          "prompt_tokens": 1540,
+          "completion_tokens": 396,
+          "output_tokens_per_second": 33.9,
+          "sentences_supported": 7,
+          "sentences_total": 9,
+          "sentences_weak": 0,
+          "sentences_unsupported": 2,
+          "risk_level": "none",
+          "flagged": [
+            {
+              "section": "O",
+              "sentence": "個案在談及上台報告時，語氣較為平靜，並提及講到後面較順。",
+              "status": "unsupported",
+              "reason": "本機模型判斷引用段落不足以支持此句",
+              "must_confirm": false,
+              "cited": "[2] client: 我有上台講了！雖然一開始手一直抖，但講到後面就比較順了。"
+            },
+            {
+              "section": "A",
+              "sentence": "心理師觀察到個案在談及同學反應時，語氣較為正面，顯示有改善的跡象。",
+              "status": "unsupported",
+              "reason": "句子寫心理師的看法或建議，但引用的都是個案的話",
+              "must_confirm": false,
+              "cited": "[6] client: 對，而且同學也沒有像我想像的那樣笑我，有一個同學還說我講得很清楚。"
+            }
+          ]
+        },
+        {
+          "session_id": "C002-S05",
+          "speech_seconds": 110.0,
+          "total_seconds": 11.7,
+          "agents_ms": {
+            "asr": 0.1,
+            "writer": 10920.5,
+            "verifier": 792.6,
+            "risk": 1.1,
+            "outcome": 0.1
+          },
+          "llm_calls": 2,
+          "prompt_tokens": 1539,
+          "completion_tokens": 397,
+          "output_tokens_per_second": 33.9,
+          "sentences_supported": 8,
+          "sentences_total": 9,
+          "sentences_weak": 0,
+          "sentences_unsupported": 1,
+          "risk_level": "none",
+          "flagged": [
+            {
+              "section": "A",
+              "sentence": "心理師觀察到個案在談及同學反應時，表現出較正面的評價，顯示有改善的跡象。",
+              "status": "unsupported",
+              "reason": "句子寫心理師的看法或建議，但引用的都是個案的話",
+              "must_confirm": false,
+              "cited": "[6] client: 對，而且同學也沒有像我想像的那樣笑我，有一個同學還說我講得很清楚。"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "median_session_seconds": 20.1,
+  "concurrent": null
+}

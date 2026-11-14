@@ -1,0 +1,11 @@
+engine: openai-compat:qwen3-8b
+  C001-S03 run 1: 20.1s, 33.6 tok/s, 11/14 supported
+  C001-S03 run 2: 20.2s, 34.1 tok/s, 12/14 supported
+  C001-S03 run 3: 16.1s, 33.8 tok/s, 9/11 supported
+  C001-S04 run 1: 28.5s, 34.0 tok/s, 12/19 supported
+  C001-S04 run 2: 41.7s, 34.4 tok/s, 11/29 supported
+  C001-S04 run 3: 27.9s, 34.3 tok/s, 19/22 supported
+  C002-S05 run 1: 11.7s, 33.6 tok/s, 6/9 supported
+  C002-S05 run 2: 11.7s, 33.9 tok/s, 7/9 supported
+  C002-S05 run 3: 11.7s, 33.9 tok/s, 8/9 supported
+wrote docs/benchmarks/b70-qwen3-8b-repeat3-20261114-0742.json, .md and -review.csv (41 flagged sentences)

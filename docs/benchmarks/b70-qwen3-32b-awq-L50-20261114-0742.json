@@ -1,0 +1,260 @@
+{
+  "label": "b70-qwen3-32b-awq-L50-20261114-0742",
+  "date": "2026-11-14T07:55:21+00:00",
+  "engine": "openai-compat:qwen3-32b-awq",
+  "llm_endpoint": "http://127.0.0.1:8000",
+  "machine": {
+    "system": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+    "processor": ""
+  },
+  "repeats": 1,
+  "sequential": [
+    {
+      "session_id": "C002-L50",
+      "repeats": 1,
+      "speech_seconds": 2967.4,
+      "total_seconds": 244.9,
+      "agents_ms": {
+        "asr": 0.9,
+        "writer": 221134.9,
+        "verifier": 23713.4,
+        "risk": 14.1,
+        "outcome": 0.0
+      },
+      "output_tokens_per_second": 24.6,
+      "sentences_supported": 88,
+      "sentences_supported_range": [
+        88,
+        88
+      ],
+      "sentences_total": 113,
+      "runs": [
+        {
+          "session_id": "C002-L50",
+          "speech_seconds": 2967.4,
+          "total_seconds": 244.9,
+          "agents_ms": {
+            "asr": 0.9,
+            "writer": 221134.9,
+            "verifier": 23713.4,
+            "risk": 14.1,
+            "outcome": 0.0
+          },
+          "llm_calls": 7,
+          "prompt_tokens": 24110,
+          "completion_tokens": 6026,
+          "output_tokens_per_second": 24.6,
+          "sentences_supported": 88,
+          "sentences_total": 113,
+          "sentences_weak": 1,
+          "sentences_unsupported": 24,
+          "risk_level": "critical",
+          "flagged": [
+            {
+              "section": "S",
+              "sentence": "個案表示當他選擇與內在聲音對話時，那個聲音會慢慢變小，不像以前那樣強烈。",
+              "status": "unsupported",
+              "reason": "代名詞「他」不在引用的逐字稿中，請確認指的是誰",
+              "must_confirm": false,
+              "cited": "[62] client: 而且我發現，當我這樣做的時候，那個聲音反而會慢慢變小，不像以前那樣強烈。"
+            },
+            {
+              "section": "S",
+              "sentence": "個案提到當他舉手發問時，雖然緊張，但完成了行動，老師也回應了他，讓他覺得自己可以做到。",
+              "status": "unsupported",
+              "reason": "代名詞「他」不在引用的逐字稿中，請確認指的是誰",
+              "must_confirm": false,
+              "cited": "[66] client: 而且我發現，當我真的舉手發問時，雖然還是會緊張，但至少我完成了，而且老師還回應了我，這讓我覺得自己其實可以做到。"
+            },
+            {
+              "section": "S",
+              "sentence": "個案表示他記錄了發問前後的焦慮分數，發問前是 7 分，發問後降到 4 分，認為行動能減輕焦慮。",
+              "status": "unsupported",
+              "reason": "代名詞「他」不在引用的逐字稿中，請確認指的是誰",
+              "must_confirm": false,
+              "cited": "[68] client: 我還記錄了發問前後的焦慮分數，發問前是 7 分，發問後反而降到 4 分，這讓我覺得，其實行動真的能減輕焦慮。"
+            },
+            {
+              "section": "S",
+              "sentence": "個案提到他發現拖延的習慣與害怕失敗有關，因為害怕失敗而逃避。",
+              "status": "unsupported",
+              "reason": "代名詞「他」不在引用的逐字稿中，請確認指的是誰",
+              "must_confirm": false,
+              "cited": "[72] client: 而且我覺得，如果我能改變那個聲音，也許我也能改變拖延的習慣，因為拖延好像也是因為害怕失敗，所以一直逃避。"
+            },
+            {
+              "section": "S",
+              "sentence": "個案表示他常常因為害怕表現不好而拖延，例如拖到最後一刻才開始寫報告。",
+              "status": "unsupported",
+              "reason": "代名詞「他」不在引用的逐字稿中，請確認指的是誰",
+              "must_confirm": false,
+              "cited": "[84] client: 而且我發現，這種害怕失敗的感覺，不只是在課堂上，還會影響我做很多事情。比如說，我常常拖到最後一刻才開始寫報告，因為我怕寫不好。"
+            },
+            {
+              "section": "S",
+              "sentence": "個案表示在課堂上提問時會擔心尷尬或被認為愚蠢，並預設他人會有負面評價。",
+              "status": "unsupported",
+              "reason": "代名詞「他」不在引用的逐字稿中，請確認指的是誰",
+              "must_confirm": false,
+              "cited": "[122] client: 不過，我還是有點擔心，如果我真的在課堂上提問，會不會還是會覺得尷尬，或者別人會覺得我很蠢。我之前不是說過，我總是預設別人會對我有負面評價嗎？"
+            },
+            {
+              "section": "S",
+              "sentence": "個案提到自己在使用番茄鐘時，特別容易在最後幾分鐘分心，並考慮設定手機休息時間或拆分番茄鐘時間。",
+              "status": "weak",
+              "reason": "風險相關句只有本機模型判斷支持，請心理師對照原句確認",
+              "must_confirm": true,
+              "cited": "[150] client: 是啊，我開始想，是不是可以設定一個「手機休息時間」，比如說番茄鐘結束後，才允許自己看一下手機。這樣至少不會在專注的時候被打斷。 / [152] client: 我也在想，是不是可以把手機設成灰階模式，這樣看起來就沒有那麼吸引人。我之前聽說過有人這樣做，說是會減少使用手機的衝動。 / [156] client: 所以我想，是不是可以在番茄鐘結束前五分鐘，提醒自己不要提前放棄專注。或者，我可以把番茄鐘的時間拆成更小的單位，比如說先試著做十五分鐘，成功後再延長。"
+            },
+            {
+              "section": "S",
+              "sentence": "個案表示願意改變對自己的態度，並開始練習自我接納，接受自己有時候會犯錯，這讓他感覺輕鬆了很多。",
+              "status": "unsupported",
+              "reason": "代名詞「他」不在引用的逐字稿中，請確認指的是誰",
+              "must_confirm": false,
+              "cited": "[302] client: 我也開始練習「自我接納」。我不再逼自己一定要做到完美，而是接受自己有時候會犯錯，這讓我感覺輕鬆了很多。"
+            },
+            {
+              "section": "S",
+              "sentence": "個案提到拖延並不是壞事，而是告訴他對某件事有壓力或焦慮，現在會先問自己「我為什麼不想做這件事？」而不是一味地責怪自己。",
+              "status": "unsupported",
+              "reason": "代名詞「他」不在引用的逐字稿中，請確認指的是誰",
+              "must_confirm": false,
+              "cited": "[304] client: 今天我還學到，拖延並不是壞事，它其實是在告訴我，我對某件事有壓力或焦慮。所以，我現在會先問自己：「我為什麼不想做這件事？」而不是一味地責怪自己。"
+            },
+            {
+              "section": "S",
+              "sentence": "個案表示失敗並不代表他就是失敗的人，每一次的失敗都是學習的機會，這讓他對未來更有希望。",
+              "status": "unsupported",
+              "reason": "代名詞「他」不在引用的逐字稿中，請確認指的是誰",
+              "must_confirm": false,
+              "cited": "[306] client: 我也開始相信，失敗並不代表我就是失敗的人。每一次的失敗，其實都是學習的機會。這讓我對未來更有希望。"
+            },
+            {
+              "section": "S",
+              "sentence": "個案提到自己現在更有能力去面對困難，而不是逃避，雖然還是會有時候想拖延，但他已經知道那是舊習慣，而不是真正的選擇。",
+              "status": "unsupported",
+              "reason": "代名詞「他」不在引用的逐字稿中，請確認指的是誰",
+              "must_confirm": false,
+              "cited": "[308] client: 我覺得自己現在更有能力去面對困難，而不是逃避。雖然還是會有時候想拖延，但我已經知道那是我的舊習慣，而不是我真正的選擇。"
+            },
+            {
+              "section": "S",
+              "sentence": "個案提到今天最大的收穫是發現自己不需要完美，也可以過得很好，這讓他對未來更有信心，也更有動力面對生活中的挑戰。",
+              "status": "unsupported",
+              "reason": "代名詞「他」不在引用的逐字稿中，請確認指的是誰",
+              "must_confirm": false,
+              "cited": "[312] client: 今天我最大的收穫是，我發現我不需要完美，也可以過得很好。這讓我對未來更有信心，也更有動力去面對生活中的挑戰。"
+            },
+            {
+              "section": "S",
+              "sentence": "個案表示自己越來越能掌控自己的想法和行為，雖然還有很多要練習的地方，但他已經看到了改變的可能。",
+              "status": "unsupported",
+              "reason": "代名詞「他」不在引用的逐字稿中，請確認指的是誰",
+              "must_confirm": false,
+              "cited": "[314] client: 我覺得自己越來越能掌控自己的想法和行為了。雖然還有很多要練習的地方，但我已經看到了改變的可能。"
+            },
+            {
+              "section": "S",
+              "sentence": "個案表示自己現在已經比較不會被情緒牽著走了，雖然還是會有壓力，但他已經知道該怎麼處理了，這讓他覺得自己更有力量。",
+              "status": "unsupported",
+              "reason": "代名詞「他」不在引用的逐字稿中，請確認指的是誰",
+              "must_confirm": false,
+              "cited": "[330] client: 我覺得自己現在已經比較不會被情緒牽著走了，雖然還是會有壓力，但我已經知道該怎麼處理了，這讓我覺得自己更有力量。"
+            },
+            {
+              "section": "O",
+              "sentence": "心理師觀察到個案在談到壓力與拖延時語氣中透露出無力感與自我懷疑。",
+              "status": "unsupported",
+              "reason": "句子寫心理師的看法或建議，但引用的都是個案的話",
+              "must_confirm": false,
+              "cited": "[6] client: 嗯，每次考試完都這樣。我總覺得自己應該做得更好，但實際上又做不到，就開始自我懷疑。 / [10] client: 我想是吧。我常常覺得壓力太大，就寧願什麼都不做，反正最後一刻再來處理。 / [18] client: 我想是的。我越責怪自己，就越不想動，好像在跟自己對抗一樣。"
+            },
+            {
+              "section": "O",
+              "sentence": "心理師觀察到個案在談到身體反應時，語氣中透露出對身體被控制的無助感。",
+              "status": "unsupported",
+              "reason": "句子寫心理師的看法或建議，但引用的都是個案的話",
+              "must_confirm": false,
+              "cited": "[33] client: 對，我常常覺得自己不是不想改變，而是身體好像被它控制住了。"
+            },
+            {
+              "section": "O",
+              "sentence": "心理師觀察到個案在會談中能清晰表達自己的想法與感受，並提出具體的解決方案。",
+              "status": "unsupported",
+              "reason": "句子寫心理師的看法或建議，但引用的都是個案的話",
+              "must_confirm": false,
+              "cited": "[124] client: 所以我想，我們是不是可以設計一個行為實驗？比如說，下週課堂上我真的提問一次，然後觀察大家的反應，再來比較我原本的預測和實際發生的事。 / [126] client: 我覺得這樣做會很有幫助，因為我總是靠想像來決定要不要行動，而不是靠實際經驗。如果我真的去做了，就能知道事情是不是真的像我想的那樣糟糕。 / [150] client: 是啊，我開始想，是不是可以設定一個「手機休息時間」，比如說番茄鐘結束後，才允許自己看一下手機。這樣至少不會在專注的時候被打斷。 / [156] client: 所以我想，是不是可以在番茄鐘結束前五分鐘，提醒自己不要提前放棄專注。或者，我可以把番茄鐘的時間拆成更小的單位，比如說先試著做十五分鐘，成功後再延長。 / [178] client: 對，我開始想，如果我真的說了，是不是會有什麼不好的結果？或者，是不是其實他會理解？我開始想練習怎麼用比較溫和的方式去表達我的需求，而不是一直壓抑。"
+            },
+            {
+              "section": "A",
+              "sentence": "心理師認為個案開始覺察到那個「聲音」的存在，並嘗試用證據挑戰它，這是一個重要的改變契機。",
+              "status": "unsupported",
+              "reason": "數字「一」不在引用的逐字稿中",
+              "must_confirm": false,
+              "cited": "[44] therapist: 那次的經驗對你來說有什麼意義？ / [48] therapist: 你說「試著改變那個聲音」，可以說說看怎麼做嗎？"
+            },
+            {
+              "section": "A",
+              "sentence": "心理師認為安排下次見面的時間，並持續練習，會幫助個案看到自己的成長。",
+              "status": "unsupported",
+              "reason": "時間詞「下次」不在引用的逐字稿中",
+              "must_confirm": false,
+              "cited": "[325] therapist: 當然可以，我們可以安排在兩週後。 / [327] therapist: 很好，記錄下來會幫助你看到自己的成長。"
+            },
+            {
+              "section": "P",
+              "sentence": "心理師提議個案可以繼續練習，不只是在課堂上發問，也可以在小組討論時多說幾句話，慢慢擴展舒適圈。",
+              "status": "unsupported",
+              "reason": "句子寫心理師的看法或建議，但引用的都是個案的話",
+              "must_confirm": false,
+              "cited": "[70] client: 所以我想，接下來我可以繼續練習，不只是在課堂上發問，也可以在小組討論時多說幾句話，慢慢擴展我的舒適圈。"
+            },
+            {
+              "section": "P",
+              "sentence": "心理師建議個案設定小目標，例如「至少去一次社團說明會」。",
+              "status": "unsupported",
+              "reason": "數字「一」不在引用的逐字稿中",
+              "must_confirm": false,
+              "cited": "[237] therapist: 這個目標設定很實際。"
+            },
+            {
+              "section": "P",
+              "sentence": "心理師提議個案繼續挑戰自動想法，並問自己『有證據支持這個想法嗎？』、『有沒有其他可能性？』。",
+              "status": "unsupported",
+              "reason": "代名詞「他」不在引用的逐字稿中，請確認指的是誰",
+              "must_confirm": false,
+              "cited": "[297] therapist: 很好，這正是認知行為治療的核心技巧。"
+            },
+            {
+              "section": "P",
+              "sentence": "心理師提議安排下次見面的時間為兩週後。",
+              "status": "unsupported",
+              "reason": "時間詞「下次」不在引用的逐字稿中",
+              "must_confirm": false,
+              "cited": "[325] therapist: 當然可以，我們可以安排在兩週後。"
+            },
+            {
+              "section": "P",
+              "sentence": "心理師提議個案在這兩週內持續練習，並記錄自己的進度，包括與室友的互動、番茄鐘的使用情況，以及對自己的想法和情緒的覺察。",
+              "status": "unsupported",
+              "reason": "句子寫心理師的看法或建議，但引用的都是個案的話",
+              "must_confirm": false,
+              "cited": "[326] client: 那我會在這兩週內持續練習，並記錄自己的進度，包括我跟室友的互動、番茄鐘的使用情況，還有我對自己的想法和情緒的覺察。"
+            },
+            {
+              "section": "P",
+              "sentence": "心理師提議個案在這段時間裡，遇到焦慮的時候，先停下來問自己「我在想什麼？」、「這個想法真實嗎？」，然後再決定要不要行動。",
+              "status": "unsupported",
+              "reason": "句子寫心理師的看法或建議，但引用的都是個案的話",
+              "must_confirm": false,
+              "cited": "[328] client: 我也想試著在這段時間裡，遇到焦慮的時候，先停下來問自己：「我在想什麼？」「這個想法真實嗎？」然後再決定要不要行動。"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "median_session_seconds": 244.9,
+  "concurrent": null
+}
