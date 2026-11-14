@@ -168,7 +168,7 @@ function engineName(engine) {
 
 function speakerName(s) {
   const name = s.speaker === "client" ? "個案" : s.speaker === "therapist" ? "心理師" : "說話者未標示";
-  return name + (s.speaker_source === "model" ? "（推測）" : "");
+  return name + (s.speaker_source === "model" ? "（推測）" : s.speaker_source === "confirmed" ? " ✓" : "");
 }
 
 function setStep(n) {
@@ -953,12 +953,20 @@ function renderSession(r, focusSeg) {
   const main = document.getElementById("main");
   const riskSegs = new Set(r.risk.flags.map((f) => f.segment_id));
 
+  const unconfirmed = locked ? [] : r.transcript.filter((s) => s.speaker_source === "model" || s.speaker_source === "none");
   const transcript = el("section", { class: "card transcript", "aria-label": "逐字稿" },
     el("h3", {}, "逐字稿 ", el("small", { lang: "en" }, "Transcript")),
+    unconfirmed.length ? el("div", { class: "speaker-bar" },
+      el("span", {}, `${unconfirmed.length} 段的說話者是推測的。請對照錄音更正，再按確認；確認後風險判讀和查核會重算。`),
+      el("button", { type: "button", class: "confirm", id: "speakers-btn", onclick: (e) => confirmSpeakers(e.currentTarget) }, "確認說話者")) : null,
     el("div", { class: "transcript-lines", tabindex: "0" },
       r.transcript.map((s) => el("div", { class: `seg${riskSegs.has(s.id) ? " risk" : ""}`, id: `seg-${s.id}` },
         el("span", { class: "t" }, `#${s.id} ${fmtTime(s.start)}`),
-        el("span", { class: `who ${s.speaker}`, title: s.speaker_source === "model" ? "由本機模型依內容推測，請對照錄音確認" : "" }, speakerName(s)),
+        unconfirmed.includes(s)
+          ? el("select", { class: "who-pick", id: `who-${s.id}`, "data-seg": s.id, "aria-label": `#${s.id} 的說話者` },
+            [["", "未確認"], ["therapist", "心理師"], ["client", "個案"]].map(([v, label]) =>
+              el("option", { value: v, selected: s.speaker === v || (!v && s.speaker === "unknown") }, label + (v && s.speaker === v ? "（推測）" : ""))))
+          : el("span", { class: `who ${s.speaker}`, title: s.speaker_source === "confirmed" ? "心理師已對照錄音確認" : "" }, speakerName(s)),
         el("span", { class: "said" }, riskSegs.has(s.id) ? el("span", { class: "risk-tag" }, "風險線索") : null, s.text),
       ))),
   );
@@ -1024,6 +1032,26 @@ async function regenerate(btn) {
       renderSession(r);
     } catch (err) {
       if (my === nav) showMessage(`沒有重新產生：${err.message}`, true);
+    }
+  });
+}
+
+async function confirmSpeakers(btn) {
+  const speakers = {};
+  document.querySelectorAll("select.who-pick").forEach((sel) => { if (sel.value) speakers[sel.dataset.seg] = sel.value; });
+  const left = document.querySelectorAll("select.who-pick").length - Object.keys(speakers).length;
+  if (!Object.keys(speakers).length) { showMessage("每一段都還是「未確認」，沒有可以送出的說話者。", true); return; }
+  if (edited && !confirm("先存檔目前的草稿修改？確認說話者後整份紀錄會重新查核。")) return;
+  if (edited) await reverify();
+  const my = nav, sid = session.session_id;
+  await busy(btn, "重新查核中", async () => {
+    try {
+      const r = await post(`/api/sessions/${encodeURIComponent(sid)}/speakers`, { speakers });
+      if (my !== nav) return;
+      renderSession(r);
+      showMessage(left ? `已確認 ${Object.keys(speakers).length} 段；還有 ${left} 段未確認。` : "說話者已全部確認，風險判讀和查核已重算。");
+    } catch (err) {
+      if (my === nav) showMessage(`沒有更新說話者：${err.message}`, true);
     }
   });
 }

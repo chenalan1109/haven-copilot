@@ -152,5 +152,38 @@ class DraftAutosaveTest(ServerCase, unittest.TestCase):
         self.assertEqual(self.call("/api/sessions/C002-S05/restore", {})[0], 409)
 
 
+class SpeakerConfirmTest(ServerCase, unittest.TestCase):
+    """Speaker correction: guessed labels on an uploaded recording become confirmed,
+    and the risk checks that count only known therapist lines start counting them."""
+
+    LINES = [("client", "最近活著好累，常常想消失。"), ("therapist", "你有想過要結束自己的生命嗎？"),
+             ("client", "有想過，但沒有計畫。"), ("therapist", "我們一起擬一份安全計畫，我也給你自殺防治專線。")]
+
+    def test_confirmed_therapist_lines_count_for_screening_and_safety(self):
+        self.data.add_session("C001-S10", self.LINES, session_no=10, source="model")
+        _, before = self.call("/api/sessions/C001-S10/open", {})
+        self.assertEqual(before["risk"]["screening_asked"], [])  # guessed speakers are not counted
+        self.assertFalse(before["risk"]["speakers_confirmed"])
+        status, after = self.call("/api/sessions/C001-S10/speakers",
+                                  {"speakers": {"1": "client", "2": "therapist", "3": "client", "4": "therapist"}})
+        self.assertEqual(status, 200)
+        self.assertIn(2, after["risk"]["screening_asked"])
+        self.assertIn(4, after["risk"]["safety_actions"])
+        self.assertTrue(all(s["speaker_source"] == "confirmed" for s in after["transcript"]))
+        with sqlite3.connect(config.DB_FILE) as c:
+            self.assertTrue(c.execute("SELECT 1 FROM audit_log WHERE action = 'speakers_confirmed'").fetchone())
+
+    def test_bad_requests(self):
+        self.data.add_session("C001-S11", self.LINES, session_no=11, source="model")
+        self.call("/api/sessions/C001-S11/open", {})
+        self.assertEqual(self.call("/api/sessions/C001-S11/speakers", {"speakers": {"99": "client"}})[0], 400)
+        self.assertEqual(self.call("/api/sessions/C001-S11/speakers", {"speakers": {"1": "boss"}})[0], 400)
+        self.assertEqual(self.call("/api/sessions/C001-S11/speakers", {"speakers": {}})[0], 400)
+
+    def test_prepared_transcript_is_refused(self):
+        self.draft("C002-S05")
+        self.assertEqual(self.call("/api/sessions/C002-S05/speakers", {"speakers": {"1": "client"}})[0], 409)
+
+
 if __name__ == "__main__":
     unittest.main()

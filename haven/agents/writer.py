@@ -15,7 +15,7 @@ import json
 import re
 
 from ..llm import DATA_ONLY
-from ..models import Note, NoteSentence, Segment, Transcript
+from ..models import CONFIRMED, Note, NoteSentence, Segment, Transcript
 from ..textutil import third_person
 from .risk import RiskAgent
 
@@ -164,10 +164,10 @@ def _plan_sentence(clause: str, proposed: bool, seg: Segment, reply: Segment | N
 
 def _quote(seg: Segment) -> NoteSentence:
     """What a line said, attributed to whoever said it."""
-    if seg.speaker == "client" and seg.speaker_source == "script":
+    if seg.speaker == "client" and seg.speaker_source in CONFIRMED:
         text = third_person(seg.text, "client")
         return NoteSentence(f"個案表示{text[2:] if text.startswith('個案') else text}。", [seg.id])
-    if seg.speaker == "therapist" and seg.speaker_source == "script":
+    if seg.speaker == "therapist" and seg.speaker_source in CONFIRMED:
         return NoteSentence(f"心理師提到：{third_person(seg.text, 'therapist')}。", [seg.id])
     return NoteSentence(f"逐字稿提到（說話者未確認）：{seg.text.rstrip('。！？')}。", [seg.id])
 

@@ -371,6 +371,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._verify(sid)
             if parts[3] == "restore":
                 return self._restore(sid)
+            if parts[3] == "speakers":
+                return self._speakers(sid)
             if parts[3] == "sign":
                 return self._sign(sid)
             if parts[3] == "addendum":
@@ -433,6 +435,36 @@ class Handler(BaseHTTPRequestHandler):
                     + ("; local model did not answer" if verification.get("llm_failed") else ""))
         return self._json({"note": to_dict(note), "verification": verification, "risk_uncovered": uncovered,
                            "draft_saved_at": result["draft_saved_at"]})
+
+    def _speakers(self, sid):
+        """The therapist sets who said each line of an uploaded recording, from
+        listening to it. Labels become "confirmed", and the risk scan, the
+        checklist and every sentence of the draft are checked again under them."""
+        changes = self._payload().get("speakers")
+        if not isinstance(changes, dict) or not changes:
+            raise BadRequest("speakers must map segment numbers to therapist or client")
+        with _session_lock(sid):
+            result, transcript, _ = _draft(sid)
+            segs = transcript.by_id()
+            wanted = {}
+            for key, who in changes.items():
+                try:
+                    seg_id = int(key)
+                except (TypeError, ValueError):
+                    raise BadRequest("segment numbers must be integers") from None
+                if seg_id not in segs or who not in ("therapist", "client"):
+                    raise BadRequest(f"segment {key}: unknown segment or speaker")
+                if segs[seg_id].speaker_source == "script":
+                    raise Refused("prepared transcripts already carry their speakers", "這份逐字稿的說話者已由原稿標好，不需要更正。")
+                wanted[seg_id] = who
+            changed = sum(1 for i, who in wanted.items() if segs[i].speaker != who)
+            for i, who in wanted.items():
+                segs[i].speaker, segs[i].speaker_source = who, "confirmed"
+            save_transcript(transcript)
+            result["transcript"] = [to_dict(s) for s in transcript.segments]
+            ORCH.refresh(result)  # risk, checklist and sentences under the confirmed labels
+            store.audit("speakers_confirmed", f"{sid}: {len(wanted)} line(s) confirmed, {changed} changed")
+        return self._json(_session_view(sid))
 
     def _restore(self, sid):
         """Throws the working draft away and goes back to the note the AI wrote."""

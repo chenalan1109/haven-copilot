@@ -12,13 +12,17 @@ class Segment:
     end: float
     speaker: str  # "therapist" | "client" | "unknown"
     text: str
-    # Three values:
-    #   "script": from a prepared transcript; the label is known.
-    #   "model":  guessed by the local LLM from the words, for uploaded audio.
-    #   "none":   uploaded audio the speaker agent did not label (no model, or no
-    #             usable answer); ``speaker`` is then "unknown".
-    # Agents treat anything but "script" as unconfirmed.
+    # Four values:
+    #   "script":    from a prepared transcript; the label is known.
+    #   "confirmed": uploaded audio; the therapist checked the label against the recording.
+    #   "model":     guessed by the local LLM from the words, for uploaded audio.
+    #   "none":      uploaded audio the speaker agent did not label (no model, or no
+    #                usable answer); ``speaker`` is then "unknown".
+    # Agents treat only CONFIRMED sources as known.
     speaker_source: str = "script"
+
+
+CONFIRMED = ("script", "confirmed")
 
 
 @dataclass

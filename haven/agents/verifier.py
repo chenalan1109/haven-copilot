@@ -28,7 +28,7 @@ import json
 import re
 
 from ..llm import DATA_ONLY
-from ..models import Note, Transcript
+from ..models import CONFIRMED, Note, Transcript
 from ..textutil import bigrams, clauses, denied, has_negation, overlap
 from . import risk as risk_agent
 
@@ -200,10 +200,10 @@ class Verifier:
                 continue
             source = "\n".join(cited)
             if _CLIENT_SAID.search(s.text) and all(segs[e].speaker == "therapist" for e in s.evidence):
-                s.status, s.support, s.reason = "unsupported", 0.0, "句子寫個案表示，但引用的都是心理師的話" + ("（說話者為模型推測）" if any(segs[e].speaker_source != "script" for e in s.evidence) else "")
+                s.status, s.support, s.reason = "unsupported", 0.0, "句子寫個案表示，但引用的都是心理師的話" + ("（說話者為模型推測）" if any(segs[e].speaker_source not in CONFIRMED for e in s.evidence) else "")
                 continue
             if _THERAPIST_SAID.search(s.text) and all(segs[e].speaker == "client" for e in s.evidence):
-                s.status, s.support, s.reason = "unsupported", 0.0, "句子寫心理師的看法或建議，但引用的都是個案的話" + ("（說話者為模型推測）" if any(segs[e].speaker_source != "script" for e in s.evidence) else "")
+                s.status, s.support, s.reason = "unsupported", 0.0, "句子寫心理師的看法或建議，但引用的都是個案的話" + ("（說話者為模型推測）" if any(segs[e].speaker_source not in CONFIRMED for e in s.evidence) else "")
                 continue
             s.support = round(max(overlap(s.text, c) for c in cited), 2)
             violation = rule_violation(s.text, source)
@@ -247,7 +247,7 @@ class Verifier:
                 continue
             # Uploaded audio: who said a line is the model's guess, so a sentence
             # about what the client said, or about risk, waits for the therapist.
-            guessed = any(segs[e].speaker_source != "script" for e in s.evidence if e in segs)
+            guessed = any(segs[e].speaker_source not in CONFIRMED for e in s.evidence if e in segs)
             if guessed and s.status == "supported" and (_CLIENT_SAID.search(s.text) or _THERAPIST_SAID.search(s.text) or about_risk(s)):
                 s.status, s.reason = "weak", "引用段落的說話者由本機模型推測，請確認是誰說的"
             instructed = any(_INSTRUCTION.search(segs[e].text) for e in s.evidence if e in segs)

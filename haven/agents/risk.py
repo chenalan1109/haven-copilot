@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import re
 
-from ..models import RiskFlag, RiskReport, Transcript
+from ..models import CONFIRMED, RiskFlag, RiskReport, Transcript
 from ..textutil import polarity
 
 LEVEL_ORDER = {"none": 0, "info": 1, "review": 2, "high": 3, "critical": 4}
@@ -204,7 +204,7 @@ def _is_question(text: str) -> bool:
 
 
 def _known_therapist(seg) -> bool:
-    return seg.speaker == "therapist" and seg.speaker_source == "script"
+    return seg.speaker == "therapist" and seg.speaker_source in CONFIRMED
 
 
 def _third_party(text: str, start: int) -> bool:
@@ -315,7 +315,7 @@ class RiskAgent:
                 reflection = bool(_REFLECTS.search(seg.text)) or (not _is_question(seg.text) and "你" in seg.text)
                 if not reflection:
                     continue
-            unconfirmed = seg.speaker_source != "script" or seg.speaker not in ("therapist", "client")
+            unconfirmed = seg.speaker_source not in CONFIRMED or seg.speaker not in ("therapist", "client")
             # Only a likely therapist question ("你有想過…嗎？") from an unconfirmed
             # speaker is lowered to review. A first-person statement such as
             # "我想燒炭" keeps its level whoever the model guessed said it.
